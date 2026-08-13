@@ -9,7 +9,6 @@ class Penghuni extends Model
 {
     use HasFactory;
 
-    // 1. Buka gembok brankas (Sudah aman dari jebakan Batman!)
     protected $fillable = [
         'user_id', 
         'nama', 
@@ -18,21 +17,30 @@ class Penghuni extends Model
         'poin',
     ];
 
-    // 2. Ajari relasi: Penghuni ini menyewa di Kamar mana?
+    // 🆕 MUTATOR BARU: Otomatis membatasi poin maksimal 600 sebelum disimpan ke database
+    public function setPoinAttribute($value)
+    {
+        // min(600, $value) artinya jika nilainya diatas 600, yang diambil tetep 600
+        $this->attributes['poin'] = min(600, max(0, $value));
+    }
+
     public function kamar()
     {
         return $this->belongsTo(Kamar::class);
     }
 
-    // 3. Ajari relasi: Penghuni ini pakai akun login yang mana?
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    // 4. INI YANG TADI SEMPAT HILANG: Penghuni ini punya tagihan apa saja?
     public function tagihans()
     {
         return $this->hasMany(Tagihan::class);
+    }
+
+    public function vouchers()
+    {
+        return $this->hasMany(Voucher::class, 'penghuni_id');
     }
 }

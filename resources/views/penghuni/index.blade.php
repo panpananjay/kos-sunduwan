@@ -32,91 +32,85 @@
             <div class="bg-white overflow-hidden shadow-sm rounded-3xl sm:rounded-2xl border border-slate-100">
                 <div class="p-4 sm:p-6 text-gray-900">
                     
-                    <div class="overflow-x-auto pb-4 custom-scrollbar">
-                        <table class="w-full text-left table-auto min-w-[900px]">
-                            <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-widest font-bold border-b border-slate-100">
-                                <tr>
-                                    <th class="py-4 px-6 rounded-tl-xl whitespace-nowrap">Nama Penghuni</th>
-                                    <th class="py-4 px-6 whitespace-nowrap">Kamar</th>
-                                    <th class="py-4 px-6 whitespace-nowrap">No. HP / WA</th>
-                                    <th class="py-4 px-6 whitespace-nowrap">Akun Login</th>
-                                    <th class="py-4 px-6 text-center rounded-tr-xl whitespace-nowrap">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-50 text-sm sm:text-base">
-                                @forelse($penghunis as $p)
-                                <tr class="hover:bg-rose-50/30 transition duration-150">
-                                    
-                                    <td class="py-4 px-6 whitespace-nowrap">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-10 h-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-lg shadow-inner border border-rose-100">
-                                                {{ substr($p->nama, 0, 1) }}
-                                            </div>
-                                            <div>
-                                                <p class="font-bold text-slate-800">{{ $p->nama }}</p>
-                                                @if(isset($p->poin) && $p->poin > 0)
-                                                    <div class="text-xs text-amber-600 font-bold flex items-center gap-1 mt-0.5 bg-amber-50 w-max px-2 py-0.5 rounded-full border border-amber-100">
-                                                        🏆 {{ $p->poin }} Poin
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        </div>
-                                    </td>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        @forelse($penghunis as $p)
+                        
+                        {{-- 🆕 LOGIKA HITUNG DURASI TINGGAL (Carbon) --}}
+                        @php 
+                            // Menggunakan created_at sebagai acuan awal masuk kos. 
+                            // Jika kamu punya kolom khusus (misal: tanggal_masuk), ganti bagian $p->created_at di bawah.
+                            $tglMasuk = $p->created_at; 
+                            $totalBulan = $tglMasuk->diffInMonths(\Carbon\Carbon::now());
+                            
+                            // Menghitung ordinal tahun ke-berapa dan bulan ke-berapa
+                            $tahunKe = floor($totalBulan / 12) + 1;
+                            $bulanKe = ($totalBulan % 12) + 1;
+                        @endphp
 
-                                    <td class="py-4 px-6 whitespace-nowrap">
-                                        <span class="bg-slate-100 text-slate-700 font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-sm shadow-sm">
-                                            {{ $p->kamar ? $p->kamar->nomor_kamar : 'Belum Ada Kamar' }}
+                        <div class="bg-white p-5 rounded-2xl border border-slate-100 flex flex-col justify-between hover:border-rose-200 transition-all duration-300 shadow-sm hover:shadow-md">
+                            
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-lg border border-rose-100 shadow-inner">
+                                        {{ substr($p->nama, 0, 1) }}
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold text-slate-800 text-sm">{{ $p->nama }}</h4>
+                                        <span class="text-[10px] text-slate-500 font-bold bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">
+                                            {{ $p->kamar ? 'Kamar ' . $p->kamar->nomor_kamar : 'Belum Ada Kamar' }}
                                         </span>
-                                    </td>
+                                    </div>
+                                </div>
+                                @if(isset($p->poin) && $p->poin > 0)
+                                    <div class="text-[10px] text-amber-600 font-bold bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
+                                        🏆 {{ $p->poin }} Poin
+                                    </div>
+                                @endif
+                            </div>
 
-                                    <td class="py-4 px-6 font-medium text-gray-600 whitespace-nowrap">
-                                        @php 
-                                            $noWa = preg_replace('/^0/', '62', $p->no_hp); 
-                                        @endphp
-                                        <a href="https://wa.me/{{ $noWa }}" target="_blank" class="inline-flex items-center gap-1.5 text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition duration-300">
-                                            💬 {{ $p->no_hp }}
-                                        </a>
-                                    </td>
+                            <div class="mb-4 text-xs font-medium text-slate-600 space-y-2">
+                                <p class="flex items-center gap-2">
+                                    <span>👤</span> {{ $p->user ? $p->user->username : 'Belum ada akun' }}
+                                </p>
+                                @php $noWa = preg_replace('/^0/', '62', $p->no_hp); @endphp
+                                <a href="https://wa.me/{{ $noWa }}" target="_blank" class="flex items-center gap-2 text-emerald-600 hover:text-emerald-700">
+                                    <span>💬</span> {{ $p->no_hp }}
+                                </a>
+                                
+                                {{-- 🆕 TAMPILAN BARU: Informasi Durasi Tinggal --}}
+                                <p class="flex items-center gap-2 text-slate-500 border-t border-dashed border-slate-100 pt-2 mt-1">
+                                    <span>📅</span> Periode: 
+                                    <span class="text-rose-600 font-bold">Tahun ke-{{ $tahunKe }}</span>, 
+                                    <span class="text-slate-700 font-bold">Bulan ke-{{ $bulanKe }}</span>
+                                </p>
+                            </div>
 
-                                    <td class="py-4 px-6 whitespace-nowrap text-gray-500 font-medium">
-                                        {{ $p->user ? $p->user->username : '-' }}
-                                    </td>
+                            <div class="pt-4 border-t border-slate-50 flex gap-2">
+                                <a href="{{ route('penghuni.edit', $p->id) }}" class="flex-1 text-center bg-slate-50 hover:bg-slate-800 text-slate-600 hover:text-white px-3 py-2 rounded-xl font-bold transition duration-300 text-xs border border-slate-200">
+                                    Edit
+                                </a>
+                                
+                                <form action="{{ route('penghuni.reset_password', $p->id) }}" method="POST" onsubmit="return confirm('Reset password {{ $p->nama }} menjadi 12345678?');">
+                                    @csrf
+                                    <button type="submit" class="flex-1 bg-slate-50 hover:bg-slate-100 text-slate-500 px-3 py-2 rounded-xl font-bold transition duration-300 text-xs border border-slate-200" title="Reset Password">
+                                        🔑
+                                    </button>
+                                </form>
 
-                                    <td class="py-4 px-6 whitespace-nowrap">
-                                        <div class="flex items-center justify-center gap-2">
-                                            <a href="{{ route('penghuni.edit', $p->id) }}" class="inline-flex items-center justify-center bg-slate-50 hover:bg-slate-800 text-slate-600 hover:text-white px-3 py-2 rounded-xl font-bold transition duration-300 text-sm border border-slate-200 shadow-sm" title="Edit Data & Pindah Kamar">
-                                                ✏️ Edit
-                                            </a>
-                                            
-                                            <form action="{{ route('penghuni.reset_password', $p->id) }}" method="POST" class="inline-block" onsubmit="return confirm('Reset password {{ $p->nama }} menjadi 12345678?');">
-                                                @csrf
-                                                <button type="submit" class="inline-flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-500 px-3 py-2 rounded-xl font-bold transition duration-300 text-sm border border-slate-200 shadow-sm" title="Kembalikan Password ke 12345678">
-                                                    🔑 Reset
-                                                </button>
-                                            </form>
-
-                                            <form action="{{ route('penghuni.destroy', $p->id) }}" method="POST" class="inline-block" onsubmit="return confirm('Yakin ingin menghapus penghuni ini permanen? Kamarnya akan otomatis menjadi kosong.');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="inline-flex items-center justify-center bg-rose-50 hover:bg-rose-600 text-rose-700 px-3 py-2 rounded-xl font-bold transition duration-300 text-sm border border-rose-200 shadow-sm" title="Hapus Permanen">
-                                                    🗑️ Hapus
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
-
-                                </tr>
-                                @empty
-                                <tr>
-                                    <td colspan="5" class="py-16 text-center text-gray-500">
-                                        <div class="text-6xl mb-4 grayscale opacity-40">📭</div>
-                                        <p class="text-xl font-bold text-slate-800">Belum ada data penghuni</p>
-                                        <p class="text-sm mt-1">Silakan klik tombol "Tambah Penghuni Baru" di atas.</p>
-                                    </td>
-                                </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+                                <form action="{{ route('penghuni.destroy', $p->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus penghuni ini?');">
+                                    @csrf @method('DELETE')
+                                    <button type="submit" class="flex-1 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white px-3 py-2 rounded-xl font-bold transition duration-300 text-xs border border-rose-200" title="Hapus">
+                                        🗑️
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        @empty
+                        <div class="col-span-full py-16 text-center border-2 border-dashed border-slate-200 rounded-3xl">
+                            <div class="text-6xl mb-4 grayscale opacity-40">📭</div>
+                            <p class="text-lg font-bold text-slate-800">Belum ada data penghuni</p>
+                        </div>
+                        @endforelse
                     </div>
                 </div>
             </div>

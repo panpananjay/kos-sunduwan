@@ -70,7 +70,11 @@ class PenghuniController extends Controller
     // MESIN 1: Untuk menampilkan formulir Edit
     public function edit($id)
     {
-        $penghuni = \App\Models\Penghuni::findOrFail($id);
+        // Ikut sertakan data user agar variabel $penghuni->username bisa terbaca di blade edit
+        $penghuni = \App\Models\Penghuni::with('user')->findOrFail($id);
+        
+        // Inject properti username langsung ke objek penghuni dari relasi tabel user (biar clean di blade)
+        $penghuni->username = $penghuni->user ? $penghuni->user->username : '';
         
         // Ambil daftar kamar (Hanya kamar kosong + kamar yang sedang dipakai anak ini)
         $kamars = \App\Models\Kamar::where('status', 'kosong')
@@ -85,10 +89,14 @@ class PenghuniController extends Controller
     {
         $penghuni = \App\Models\Penghuni::findOrFail($id);
 
+        // 1. Tambahkan validasi username unik, kecuali untuk ID User milik penghuni ini sendiri
         $request->validate([
             'nama' => 'required|string|max:255',
+            'username' => 'required|string|max:255|unique:users,username,' . $penghuni->user_id,
             'no_hp' => 'required|string|max:20',
             'kamar_id' => 'required'
+        ], [
+            'username.unique' => 'Maaf, username ini sudah digunakan oleh akun lain!',
         ]);
 
         // KABEL PENGHUBUNG 2: Cek apakah penghuni ini PINDAH KAMAR?
@@ -106,22 +114,25 @@ class PenghuniController extends Controller
             }
         }
 
-        // Simpan perubahan biodatanya
+        // Simpan perubahan biodatanya ke tabel penghunis
         $penghuni->update([
             'nama' => $request->nama,
             'no_hp' => $request->no_hp,
             'kamar_id' => $request->kamar_id,
         ]);
 
-        // Update nama di akun loginnya juga
+        // SINKRONISASI BARU: Update Nama DAN Username di akun login (tabel users)
         if ($penghuni->user_id) {
             $user = \App\Models\User::find($penghuni->user_id);
             if ($user) {
-                $user->update(['name' => $request->nama]);
+                $user->update([
+                    'name' => $request->nama,
+                    'username' => $request->username // 👤 Username terupdate dengan aman!
+                ]);
             }
         }
 
-        return redirect()->route('penghuni.index')->with('success', 'Data penghuni berhasil diperbarui!');
+        return redirect()->route('penghuni.index')->with('success', 'Data penghuni dan akun login berhasil diperbarui!');
     }
 
     public function destroy($id)

@@ -8,6 +8,8 @@ use App\Http\Controllers\PenghuniController;
 use App\Http\Controllers\TagihanController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PengaduanController;
+use App\Http\Controllers\PoinController;
+use App\Http\Controllers\VoucherController;
 
 /*
 |--------------------------------------------------------------------------
@@ -48,13 +50,19 @@ Route::middleware('auth')->group(function () {
 
     // Fitur Tagihan & Midtrans (SUDAH SIMPEL TANPA DETAIL/SHOW)
     Route::get('/tagihan', [TagihanController::class, 'index'])->name('tagihan.index');
-    Route::post('/tagihan/{id}/bayar', [TagihanController::class, 'bayar'])->name('tagihan.bayar'); 
+    Route::post('/tagihan/{id}/bayar', [TagihanController::class, 'bayar'])->name('tagihan.bayar');
+    Route::get('/tagihan/{id}/unduh', [TagihanController::class, 'unduh'])->name('tagihan.unduh');
 
     // Fitur Pengaduan
     Route::get('/pengaduan', [PengaduanController::class, 'index'])->name('pengaduan.index');
     Route::get('/pengaduan/buat', [PengaduanController::class, 'create'])->name('pengaduan.create');
     Route::post('/pengaduan', [PengaduanController::class, 'store'])->name('pengaduan.store');
     Route::delete('/pengaduan/{pengaduan}', [PengaduanController::class, 'destroy'])->name('pengaduan.destroy');
+
+    // Fitur Poin & Voucher (Tenant Scoring)
+    Route::get('/voucher', [VoucherController::class, 'index'])->name('voucher.index');
+    Route::post('/poin/tukar', [PoinController::class, 'tukarPoin'])->name('poin.tukar');
+    Route::post('/voucher/{id}/gunakan', [PoinController::class, 'gunakanVoucher'])->name('voucher.gunakan');
 });
 
 

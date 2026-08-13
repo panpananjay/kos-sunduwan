@@ -11,6 +11,7 @@
     <div class="py-12 bg-slate-50 min-h-screen">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             
+            {{-- HEADER: SEAMLESS WELCOME NOTE UNTUK KEDUA ROLE --}}
             <div class="mb-8 mt-2 flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                     <h3 class="text-2xl sm:text-4xl font-black text-slate-800 tracking-tight">
@@ -55,7 +56,25 @@
                 @endif
             </div>
 
+            {{-- NOTIFIKASI SESSION --}}
+            @if(session('success'))
+                <div class="mb-6 p-4 bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-2xl font-bold text-sm flex items-center gap-2 shadow-sm animate-pulse-subtle">
+                    <span>🎉</span> {{ session('success') }}
+                </div>
+            @endif
+
+            @if(session('error'))
+                <div class="mb-6 p-4 bg-rose-100 border border-rose-200 text-rose-800 rounded-2xl font-bold text-sm flex items-center gap-2 shadow-sm animate-pulse-subtle">
+                    <span>🚨</span> {{ session('error') }}
+                </div>
+            @endif
+
+
+            {{-- ================================================================== --}}
+            {{--                        KONDISI 1: DASHBOARD ADMIN                  --}}
+            {{-- ================================================================== --}}
             @if(auth()->user()->role == 'admin')
+                
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
                     <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between group hover:shadow-md transition-all duration-300">
                         <div>
@@ -121,122 +140,238 @@
                                 <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Bulan +{{ $index + 1 }}</p>
                                 <p class="text-base font-bold text-slate-700">{{ $data['bulan'] }}</p>
                             </div>
-                            <p class="text-xl font-black text-rose-600">Rp {{ number_format($data['estimasi'], 0, ',', '.') }}</p>
+                            {{-- Menggunakan floor() untuk membuang desimal ekor .333 --}}
+                            <p class="text-xl font-black text-rose-600">Rp {{ number_format(floor($data['estimasi']), 0, ',', '.') }}</p>
                         </div>
                         @endforeach
                     </div>
                 </div>
 
+
+            {{-- ================================================================== --}}
+            {{--                        KONDISI 2: DASHBOARD PENGHUNI                --}}
+            {{-- ================================================================== --}}
             @else
                 @if($penghuniKu)
                     
-                {{-- NOTIFIKASI TAGIHAN --}}
-                @if($tagihanBulanIni && $tagihanBulanIni->status != 'lunas')
-                    <div class="mb-8 bg-gradient-to-r from-rose-500 to-orange-500 rounded-[2rem] p-5 md:p-8 text-white shadow-lg shadow-rose-100/50 relative overflow-hidden group animate-pulse-subtle">
-                        {{-- Aksen Glassmorphism --}}
-                        <div class="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
-                        
-                        <div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                            <div class="flex items-center gap-4 md:gap-6 w-full">
-                                {{-- Icon Box --}}
-                                <div class="flex-none w-14 h-14 md:w-16 md:h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl md:text-3xl shadow-inner border border-white/30">
-                                    🔔
-                                </div>
-                                
-                                <div class="flex-1 min-w-0">
-                                    <h4 class="font-black text-base md:text-xl leading-tight tracking-tight truncate">
-                                        Tagihan {{ $tagihanBulanIni->bulan }} Belum Lunas
-                                    </h4>
-                                    <p class="text-rose-100 text-[10px] md:text-xs font-semibold uppercase tracking-wider mt-1 opacity-90">
-                                        Sisa Waktu Pembayaran:
+                    {{-- Tagihan Belum Lunas Alert --}}
+                    @if($tagihanBulanIni && $tagihanBulanIni->status != 'lunas')
+                        <div class="mb-8 bg-gradient-to-r from-rose-500 to-orange-500 p-6 rounded-[2rem] shadow-lg shadow-rose-100 text-white flex flex-col items-start gap-6 animate-pulse-subtle">
+                            <div class="flex items-start gap-4 w-full">
+                                <span class="text-4xl mt-1">📢</span>
+                                <div class="flex-1">
+                                    <h4 class="font-black text-lg">Tagihan {{ $tagihanBulanIni->bulan }} Belum Lunas</h4>
+                                    <p class="text-rose-100 text-sm mt-1">
+                                        Segera lunasi tagihanmu sampai seminggu kedepan jika tidak mau kehilangan poin! (Poin saat ini: <strong>{{ $penghuniKu->poin }}</strong>)
                                     </p>
-                                    {{-- Timer Digital --}}
-                                    <div id="countdown-timer" class="flex items-center gap-1.5 font-mono text-lg md:text-2xl font-black text-white drop-shadow-sm mt-0.5">
-                                        <span id="timer-val" class="tracking-widest">00 : 00 : 00 : 00</span>
+                                    <div class="flex items-center mt-3">
+                                        <div id="countdown-timer" class="flex items-center gap-2 font-mono text-xl md:text-2xl font-bold tracking-widest text-white/90 drop-shadow-sm">
+                                            <span class="text-[10px] font-light animate-pulse tracking-normal">LOAD...</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {{-- Tombol: Rapi & Tidak Terlalu Lebar --}}
-                            <div class="w-full md:w-auto md:ml-auto">
-                                <a href="{{ route('tagihan.index') }}" class="block w-full md:min-w-[180px] md:max-w-[220px] bg-white text-rose-600 font-extrabold px-8 py-3.5 md:py-4 rounded-xl md:rounded-2xl hover:bg-rose-50 hover:scale-105 active:scale-95 transition-all text-sm md:text-base text-center shadow-md whitespace-nowrap">
-                                    CEK TAGIHAN SAYA
-                                </a>
-                            </div>
+                            <a href="{{ route('tagihan.show', $tagihanBulanIni->id) }}" class="w-full bg-white text-rose-600 font-black px-6 py-3.5 rounded-xl hover:bg-rose-50 transition-all shadow-md text-center text-base mt-2 block transform hover:-translate-y-0.5 duration-300">
+                                💳 Bayar Rp {{ number_format($tagihanBulanIni->jumlah_tagihan, 0, ',', '.') }}
+                            </a>
                         </div>
-                    </div>
 
-                    {{-- Script Timer --}}
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function() {
-                            const timerVal = document.getElementById('timer-val');
-                            if (!timerVal) return;
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function() {
+                                const timerDisplay = document.getElementById('countdown-timer');
+                                if (!timerDisplay) return;
 
-                            const createdDate = new Date("{{ $tagihanBulanIni->created_at->toIso8601String() }}").getTime();
-                            const deadline = createdDate + (7 * 24 * 60 * 60 * 1000);
+                                const createdDate = new Date("{{ $tagihanBulanIni->created_at->toIso8601String() }}").getTime();
+                                const deadline = createdDate + (7 * 24 * 60 * 60 * 1000);
 
-                            const x = setInterval(function() {
-                                const now = new Date().getTime();
-                                const distance = deadline - now;
+                                const x = setInterval(function() {
+                                    const now = new Date().getTime();
+                                    const distance = deadline - now;
 
-                                if (distance < 0) {
-                                    clearInterval(x);
-                                    timerVal.innerHTML = "<span class='text-sm tracking-widest'>WAKTU HABIS 🚨</span>";
-                                    return;
-                                }
+                                    if (distance < 0) {
+                                        clearInterval(x);
+                                        timerDisplay.innerHTML = "<span class='text-sm uppercase tracking-widest'>Waktu Habis 🚨</span>";
+                                        return;
+                                    }
 
-                                const d = Math.floor(distance / (1000 * 60 * 60 * 24));
-                                const h = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-                                const s = Math.floor((distance % (1000 * 60)) / 1000);
+                                    const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                                    const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                    const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                                    const seconds = Math.floor((distance % (1000 * 60)) / 1000);
 
-                                const pad = (n) => n.toString().padStart(2, '0');
-                                timerVal.innerHTML = `${pad(d)} : ${pad(h)} : ${pad(m)} : ${pad(s)}`;
-                            }, 1000);
-                        });
-                    </script>
+                                    const f = (num) => num.toString().padStart(2, '0');
 
-                    {{-- Style Efek Semula --}}
-                    <style>
-                        @keyframes pulse-subtle { 
-                            0%, 100% { transform: scale(1); } 
-                            50% { transform: scale(1.01); } 
-                        }
-                        .animate-pulse-subtle { 
-                            animation: pulse-subtle 3s infinite ease-in-out; 
-                        }
-                    </style>
-                @endif
-
+                                    timerDisplay.innerHTML = `
+                                        <span>${f(days)}</span>
+                                        <span class="text-xl opacity-40 font-light">:</span>
+                                        <span>${f(hours)}</span>
+                                        <span class="text-xl opacity-40 font-light">:</span>
+                                        <span>${f(minutes)}</span>
+                                        <span class="text-xl opacity-40 font-light animate-none">:</span>
+                                        <span class="text-rose-200">${f(seconds)}</span>
+                                    `;
+                                }, 1000);
+                            });
+                        </script>
+                    @endif
+                    {{-- Informasi Profil Penghuni --}}
                     <div class="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100 mb-8 flex flex-col md:flex-row items-center gap-6 relative overflow-hidden">
                         <div class="w-24 h-24 sm:w-28 sm:h-28 bg-gradient-to-tr from-rose-500 to-fuchsia-600 rounded-full flex items-center justify-center text-white text-4xl shadow-lg border-4 border-white relative z-10 flex-shrink-0">👩🏻</div>
+                        
                         <div class="text-center md:text-left relative z-10 flex-1">
                             <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mb-2">
                                 <h2 class="text-2xl font-black text-slate-800">{{ $penghuniKu->nama }}</h2>
                                 <span class="bg-emerald-100 text-emerald-600 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full w-max mx-auto md:mx-0">Penghuni Aktif</span>
                             </div>
+                            
                             <div class="flex flex-wrap justify-center md:justify-start gap-4 sm:gap-6 text-sm font-medium text-slate-500 mt-3">
                                 <div>🚪 Kamar: <strong class="text-slate-700">{{ $penghuniKu->kamar?->nomor_kamar ?? '-' }}</strong></div>
                                 <div>📱 HP: <strong class="text-slate-700">{{ $penghuniKu->no_hp }}</strong></div>
+                                
+                                {{-- Mengambil tanggal pembayaran pertama yang berstatus lunas --}}
+                                @php
+                                    $pembayaranPertama = \App\Models\Tagihan::where('penghuni_id', $penghuniKu->id)
+                                        ->where('status', 'lunas')
+                                        ->oldest()
+                                        ->first();
+                                @endphp
+
+                                <div>📅 Tanggal Masuk: 
+                                    <strong class="text-slate-700">
+                                        {{ $pembayaranPertama ? \Carbon\Carbon::parse($pembayaranPertama->created_at)->translatedFormat('d F Y') : '-' }}
+                                    </strong>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-                        <div class="bg-gradient-to-br from-amber-400 to-orange-500 p-6 rounded-[2rem] text-white shadow-lg shadow-orange-100">
-                            <p class="text-[10px] font-bold uppercase tracking-widest opacity-80">POIN SAYA</p>
-                            <p class="text-3xl font-black">{{ $penghuniKu->poin }} Poin</p>
-                        </div>
-                        <div class="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-[2rem] text-white shadow-lg shadow-indigo-100">
-                            <p class="text-[10px] font-bold uppercase tracking-widest opacity-80">LEVEL SAYA</p>
-                            <p class="text-xl font-black">{{ $level ?? 'Penghuni Baru' }}</p>
-                        </div>
-                        <div class="bg-gradient-to-br from-emerald-400 to-teal-500 p-6 rounded-[2rem] text-white shadow-lg shadow-emerald-100">
-                            <p class="text-[10px] font-bold uppercase tracking-widest opacity-80">TRACK RECORD</p>
-                            <p class="text-xl font-black">{{ $totalLunas ?? 0 }}x Lunas</p>
+                    {{-- Gamifikasi & Poin Status: PREMIUM GAMIFIED CARD --}}
+                    <div class="bg-white rounded-[2.5rem] p-1 shadow-sm border border-slate-100 mb-8 relative overflow-hidden group/card bg-gradient-to-r from-rose-500/5 via-transparent to-indigo-500/5">
+                        
+                        {{-- Decorative Background Glow --}}
+                        <div class="absolute -right-10 -top-10 w-32 h-32 bg-indigo-200/20 rounded-full blur-2xl pointer-events-none transition-all duration-700 group-hover/card:scale-150"></div>
+                        <div class="absolute -left-10 -bottom-10 w-32 h-32 bg-rose-200/20 rounded-full blur-2xl pointer-events-none transition-all duration-700 group-hover/card:scale-150"></div>
+
+                        <div class="bg-white/80 backdrop-blur-md rounded-[2.3rem] p-6 sm:p-7 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 relative z-10">
+                            
+                            {{-- SEKSI 1: POIN SAYA (INTERACTIVE ACTION) --}}
+                            <button type="button" onclick="cekSyaratPoin({{ $penghuniKu->poin }})" class="pb-6 sm:pb-0 sm:pr-8 group/item focus:outline-none text-left w-full block relative">
+                                <div class="flex items-center gap-4 transition-all duration-300 group-hover/item:translate-x-1">
+                                    <div class="w-14 h-14 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center text-white shadow-md shadow-orange-200 transition-transform duration-300 group-hover/item:rotate-12 group-hover/item:scale-110">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Poin Saya</span>
+                                        <span class="text-2xl font-black text-slate-800 tracking-tight block mt-0.5 group-hover/item:text-orange-500 transition-colors">
+                                            {{ $penghuniKu->poin }} <span class="text-xs font-bold text-slate-400 tracking-normal">Pts</span>
+                                        </span>
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full mt-1.5 border border-amber-100 group-hover/item:bg-amber-500 group-hover/item:text-white group-hover/item:border-transparent transition-all duration-300">
+                                            Tukar Voucher ➜
+                                        </span>
+                                    </div>
+                                </div>
+                            </button>
+
+                            {{-- SEKSI 2: LEVEL SAYA --}}
+                            <div class="py-6 sm:py-0 sm:px-8 flex items-center gap-4">
+                                <div class="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white shadow-md shadow-indigo-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Level Saya</span>
+                                    <span class="text-lg font-black text-slate-800 tracking-tight block mt-0.5">
+                                        {{ $level ?? 'Penghuni Baru 🌱' }}
+                                    </span>
+                                    <span class="text-[10px] font-semibold text-slate-400 mt-1 block">Level membership aktif kamu</span>
+                                </div>
+                            </div>
+                            
+                            {{-- SEKSI 3: TRACK RECORD --}}
+                            <div class="pt-6 sm:pt-0 sm:pl-8 flex items-center gap-4">
+                                <div class="w-14 h-14 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center text-white shadow-md shadow-emerald-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Track Record</span>
+                                    <span class="text-lg font-black text-emerald-600 tracking-tight block mt-0.5">
+                                        {{ $totalLunas ?? 0 }}x <span class="text-slate-800 font-bold">Lunas</span>
+                                    </span class="text-slate-800 font-bold">
+                                    <span class="text-[10px] font-semibold text-slate-400 mt-1 block">Pembayaran tepat waktu</span>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
 
+                    {{-- Inventory Voucher --}}
+                    <div class="mt-6 mb-8 p-6 bg-white rounded-[2rem] shadow-sm border border-slate-100">
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="text-xl">🎒</span>
+                            <h4 class="font-black text-slate-800 text-base uppercase tracking-wider">Inventory Voucher Diskon</h4>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            @php
+                                // Menambahkan filter untuk mengabaikan voucher berstatus 'terpakai'
+                                $vouchers = \App\Models\Voucher::where('penghuni_id', $penghuniKu->id)
+                                    ->where('status', '!=', 'terpakai')
+                                    ->orderByRaw("FIELD(status, 'aktif', 'expired')")
+                                    ->latest()
+                                    ->get();
+                            @endphp
+
+                            @forelse($vouchers as $v)
+                                @php
+                                    if ($v->status == 'aktif' && \Carbon\Carbon::now()->gt($v->masa_berlaku)) {
+                                        $v->update(['status' => 'expired']);
+                                    }
+                                @endphp
+
+                                <div class="p-5 rounded-2xl border flex justify-between items-center transition-all duration-300 relative overflow-hidden {{ $v->status == 'aktif' ? 'border-emerald-200 bg-emerald-50/40 shadow-sm shadow-emerald-50' : 'border-slate-200 bg-slate-100/70 opacity-60 select-none' }}">
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-mono font-black tracking-wide text-sm {{ $v->status == 'aktif' ? 'text-emerald-700' : 'text-slate-500 line-through' }}">
+                                                {{ $v->kode_voucher }}
+                                            </span>
+                                            <span class="text-[9px] px-2 py-0.5 rounded-full font-black tracking-wide {{ $v->status == 'aktif' ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-100 text-rose-700' }}">
+                                                {{ strtoupper($v->status) }}
+                                            </span>
+                                        </div>
+                                        <p class="text-xs mt-1 text-slate-500">Potongan Sewa: <strong class="text-slate-700">Rp 50.000</strong></p>
+                                        <small class="text-[10px] block mt-0.5 text-slate-400">Expired: {{ \Carbon\Carbon::parse($v->masa_berlaku)->translatedFormat('d F Y') }}</small>
+                                    </div>
+
+                                    <div class="relative flex items-center justify-center min-w-[100px]">
+                                        @if($v->status == 'aktif')
+                                            <form action="{{ route('poin.gunakan', $v->id) }}" method="POST" onsubmit="return confirm('Gunakan voucher ini untuk memotong tagihan bulan ini?')">
+                                                @csrf
+                                                <button type="submit" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-sm transition transform active:scale-95">
+                                                    Gunakan
+                                                </button>
+                                            </form>
+                                        @else
+                                            <div class="border-4 border-dashed border-rose-500/80 text-rose-500/80 font-black text-xs uppercase tracking-widest px-3 py-1 rounded-lg transform -rotate-12 shadow-sm pointer-events-none select-none my-1 font-mono">
+                                                EXPIRED
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="col-span-1 md:col-span-2 text-center py-8 border border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm font-medium italic">
+                                    🎒 Inventory kosong. Yuk, kumpulkan poin disiplin untuk klaim voucher sewa!
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    {{-- Laporan Kendala/Pengaduan --}}
                     <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
                         <div class="flex justify-between items-center mb-6">
                             <h4 class="text-lg font-black text-slate-800 flex items-center gap-2">
@@ -279,12 +414,49 @@
         </div>
     </div>
 
+    {{-- MODAL GLOBAL GAMIFIKASI POIN (MINIMALIST PREMIUM VERSION) --}}
+    <div id="modalPoin" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden backdrop-blur-md transition-all duration-300">
+        <div class="bg-white/95 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl shadow-slate-900/20 transform scale-95 border border-white/40 text-center relative overflow-hidden animate-fade-in">
+            
+            {{-- Icon Container dengan Background Circle yang Lembut --}}
+            <div id="modalIconContainer" class="w-20 h-20 mx-auto rounded-3xl flex items-center justify-center text-3xl mb-5 shadow-sm transition-all duration-300">
+                <span id="modalIcon"></span>
+            </div>
+
+            {{-- Konten Teks --}}
+            <h3 class="text-xl font-black text-slate-800 tracking-tight mb-2" id="modalTitle">
+                Konfirmasi
+            </h3>
+            <p class="text-xs sm:text-sm text-slate-500 leading-relaxed px-2 mb-6" id="modalBody">
+                Detail status poin kamu akan dimuat di sini.
+            </p>
+            
+            {{-- Area Tombol / Aksi --}}
+            <div class="flex items-center gap-3 justify-center w-full">
+                <button type="button" onclick="closeModal()" class="w-full sm:w-auto min-w-[100px] px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black rounded-2xl transition-all duration-200 active:scale-95">
+                    Kembali
+                </button>
+                <form id="formKlaim" action="{{ route('poin.tukar') }}" method="POST" class="hidden w-full sm:w-auto">
+                    @csrf
+                    <button type="submit" class="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs font-black rounded-2xl shadow-md shadow-emerald-100 transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5a2 2 0 10-2 2h2zm0 0h4m-4 0H8m12 3v6a2 2 0 01-2 2H6a2 2 0 01-2-2v-6m16 0a2 2 0 00-2-2H6a2 2 0 00-2 2m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5" />
+                        </svg>
+                        Klaim Voucher
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- SCRIPT SPESIFIK UNTUK ADMIN (CHART JS) --}}
     @if(auth()->user()->role == 'admin')
         <div id="chart-data" 
             data-labels='{!! json_encode(array_values(array_map(function($data, $index) {
                 return $data["bulan"] . " " . date("Y", strtotime("+" . ($index + 1) . " month"));
             }, $forecasting, array_keys($forecasting)))) !!}'
-            data-points='{!! json_encode(array_column($forecasting, "estimasi")) !!}'
+            {{-- Lakukan array_map floor agar data array murni angka bulat --}}
+            data-points='{!! json_encode(array_map('floor', array_column($forecasting, "estimasi"))) !!}'
             style="display: none;">
         </div>
 
@@ -324,13 +496,31 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
+                        plugins: { 
+                            legend: { display: false },
+                            // Tambahkan konfigurasi tooltip ini untuk merapikan teks saat di-hover
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            // Membulatkan nilai y dan memformatnya ke Rupiah tanpa desimal ekor
+                                            label += 'Rp ' + new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Math.floor(context.parsed.y));
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
                         scales: {
                             y: {
                                 beginAtZero: true,
                                 ticks: {
                                     callback: function(value) {
-                                        return 'Rp ' + new Intl.NumberFormat('id-ID').format(value);
+                                        return 'Rp ' + new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(value);
                                     }
                                 }
                             }
@@ -341,13 +531,32 @@
         </script>
     @endif
 
-    <style>
-        @keyframes pulse-subtle {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.01); }
+    {{-- JAVASCRIPT UTAMA UNTUK MODAL POIN --}}
+    <script>
+        function cekSyaratPoin(poin) {
+            const modal = document.getElementById('modalPoin');
+            const icon = document.getElementById('modalIcon');
+            const title = document.getElementById('modalTitle');
+            const body = document.getElementById('modalBody');
+            const formKlaim = document.getElementById('formKlaim');
+
+            modal.classList.replace('hidden', 'flex');
+
+            if (poin >= 550) {
+                icon.innerHTML = "🎉";
+                title.innerText = "Poin Memenuhi Syarat!";
+                body.innerText = "Poin kamu saat ini (" + poin + ") sudah memenuhi syarat untuk ditukarkan dengan voucher potongan sewa kos sebesar Rp 50.000. Tukarkan sekarang? (550 Poin akan dikurangi).";
+                formKlaim.classList.remove('hidden');
+            } else {
+                icon.innerHTML = "🔒";
+                title.innerText = "Poin Belum Cukup";
+                body.innerText = "Poin kamu saat ini (" + poin + ") belum cukup. Minimal kamu harus mengumpulkan 550 poin disiplin bayar untuk bisa klaim voucher potongan sewa kos.";
+                formKlaim.classList.add('hidden');
+            }
         }
-        .animate-pulse-subtle {
-            animation: pulse-subtle 3s infinite ease-in-out;
+
+        function closeModal() {
+            document.getElementById('modalPoin').classList.replace('flex', 'hidden');
         }
-    </style>
+    </script>
 </x-app-layout>

@@ -120,7 +120,23 @@ class TagihanController extends Controller
         $this->generateInvoiceImage($tagihan);
 
         // 3. Kirim WhatsApp via Fonnte
-        $this->sendWhatsApp($tagihan->penghuni->no_hp, "Halo *{$tagihan->penghuni->nama}*! Pembayaran tagihan periode {$tagihan->bulan} {$tagihan->tahun} telah LUNAS. Terima kasih! ✨");
+        $nominal = number_format($tagihan->jumlah_tagihan, 0, ',', '.');
+        $totalPoin = $tagihan->penghuni->fresh()->poin;
+        $labelPoin = ($selisihHari <= 7) ? "TEPAT WAKTU! Anda mendapatkan +50 Poin Kedisiplinan." : "Terlambat, Anda dikurangi 50 Poin Kedisiplinan.";
+        $linkInvoice = route('tagihan.unduh', $tagihan->id);
+
+        $pesan = "*--- PEMBAYARAN KOS LUNAS ---*\n" .
+                "Halo *{$tagihan->penghuni->nama}* 👋\n" .
+                "Terima kasih, pembayaran kos periode *{$tagihan->bulan} {$tagihan->tahun}* sebesar *Rp {$nominal}* telah SUKSES diverifikasi otomatis oleh sistem.\n" .
+                "🏆 *POIN:*\n" .
+                "{$labelPoin}\n" .
+                "Total indeks kedisiplinan Anda saat ini: *{$totalPoin} Poin*.\n" .
+                "📄 *E-INVOICE RESMI:*\n" .
+                "Silakan unduh bukti pembayaran sah Anda di sini:\n" .
+                "{$linkInvoice}\n" .
+                "Salam hangat, Kos Putri Sunduwan ✨";
+
+        $this->sendWhatsApp($tagihan->penghuni->no_hp, $pesan);
     }
 
     private function generateInvoiceImage($tagihan)
@@ -138,6 +154,22 @@ class TagihanController extends Controller
         // Simpan ke storage
         $namaFile = 'Invoice_' . $tagihan->id . '.png';
         Storage::disk('public')->put('invoices/' . $namaFile, (string) $img->encodeByExtension('png'));
+    }
+
+    /**
+     * Download invoice yang sudah di-generate (dipanggil dari tombol "Invoice" di blade)
+     */
+    public function unduh($id)
+    {
+        $tagihan = Tagihan::findOrFail($id);
+        $namaFile = 'Invoice_' . $tagihan->id . '.png';
+        $path = 'invoices/' . $namaFile;
+
+        if (!Storage::disk('public')->exists($path)) {
+            return redirect()->route('tagihan.index')->with('error', 'File invoice belum tersedia untuk tagihan ini.');
+        }
+
+        return Storage::disk('public')->download($path, $namaFile);
     }
 
     // --- MANAJEMEN TAGIHAN ADMIN ---
@@ -171,11 +203,12 @@ class TagihanController extends Controller
             }
 
             $nominal = number_format($tagihan->jumlah_tagihan, 0, ',', '.');
-            $pesan = "*--- NOTIFIKASI TAGIHAN KOS ---*\n\n" .
-                     "Halo *{$penghuni->nama}* 👋\n" .
-                     "Tagihan periode *{$bulan} {$tahun}* sudah terbit.\n" .
-                     "💰 Total: *Rp {$nominal}*\n\n" .
-                     "Silakan lakukan pembayaran melalui aplikasi. ✨";
+            $pesan = "*--- NOTIFIKASI TAGIHAN KOS ---*\n" .
+                    "Halo *{$penghuni->nama}* 👋\n" .
+                    "Informasi tagihan periode *{$bulan} {$tahun}* sudah terbit.\n" .
+                    "💰 Total: *Rp {$nominal}*\n" .
+                    "📌 Status: *BELUM BAYAR*\n" .
+                    "Silakan selesaikan pembayaran otomatis secara aman melalui aplikasi ya! ✨";
             
             $this->sendWhatsApp($penghuni->no_hp, $pesan);
             $jumlahTerkirim++;
@@ -188,8 +221,24 @@ class TagihanController extends Controller
     {
         // Tetap ada buat jaga-jaga kalau admin mau melunasi manual tanpa lewat Midtrans
         $tagihan = Tagihan::findOrFail($id);
+
+        if ($tagihan->status == 'lunas') {
+            return redirect()->route('tagihan.index')->with('success', 'Tagihan ini sudah lunas sebelumnya.');
+        }
+
         $this->prosesPelunasanOtomatis($tagihan);
         return redirect()->route('tagihan.index')->with('success', 'Tagihan berhasil dilunasi manual! ✅');
+    }
+
+    /**
+     * Tandai tagihan sebagai ditolak/belum bayar (route sudah ada sebelumnya tapi method-nya hilang)
+     */
+    public function tolak($id)
+    {
+        $tagihan = Tagihan::findOrFail($id);
+        $tagihan->update(['status' => 'belum_bayar', 'catatan' => 'Pembayaran ditolak/dibatalkan admin']);
+
+        return redirect()->route('tagihan.index')->with('success', 'Tagihan ditandai belum bayar.');
     }
 
     public function destroy($id)

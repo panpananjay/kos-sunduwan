@@ -11,6 +11,9 @@ export default defineConfig({
         VitePWA({
             registerType: 'autoUpdate',
             injectRegister: 'auto',
+            // PENTING UNTUK LARAVEL: Mengarahkan build ke folder public luar agar service worker terdaftar dengan benar di root domain
+            buildBase: '/',
+            scope: '/',
             manifest: {
                 name: 'Kos Putri Sunduwan',
                 short_name: 'Sunduwan',
@@ -22,7 +25,7 @@ export default defineConfig({
                 start_url: '/',
                 icons: [
                     {
-                        src: '/images/logo-sunduwan-pwa.png',
+                        src: '/images/logo-sunduwan-pwa.png', // Pastikan file ini ada di public/images/logo-sunduwan-pwa.png
                         sizes: '192x192',
                         type: 'image/png',
                         purpose: 'any'
@@ -31,9 +34,15 @@ export default defineConfig({
                         src: '/images/logo-sunduwan-pwa.png',
                         sizes: '512x512',
                         type: 'image/png',
-                        purpose: 'maskable'
+                        purpose: 'maskable' // Sangat baik sudah menyediakan varian maskable!
                     }
                 ]
+            },
+            // Tambahan konfigurasi jika ingin mengontrol aset apa saja yang masuk ke cache offline workbox
+            workbox: {
+                globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+                // Menghindari konflik manifest bawaan Laravel Mix/Vite
+                dontCacheBustURLsMatching: /\.[0-9a-f]{8}\./,
             }
         })
     ],
