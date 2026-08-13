@@ -9,13 +9,13 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-   public function up(): void
+    public function up(): void
     {
         Schema::create('tagihans', function (Blueprint $table) {
-            $table->id();
+            $table->integerIncrements('id'); // INT UNSIGNED AUTO_INCREMENT
             
-            // Relasi ke tabel penghuni (Tagihan ini milik siapa?)
-            $table->foreignId('penghuni_id')->constrained('penghunis')->onDelete('cascade');
+            // Relasi ke tabel penghuni (Tipe INT UNSIGNED agar cocok dengan penghunis.id)
+            $table->unsignedInteger('penghuni_id');
             
             // Informasi Bulan dan Tahun Tagihan
             $table->string('bulan'); // Contoh: "Maret"
@@ -31,6 +31,12 @@ return new class extends Migration
             $table->string('bukti_bayar')->nullable(); 
             
             $table->timestamps();
+
+            // Deklarasi Foreign Key eksplisit
+            $table->foreign('penghuni_id')
+                  ->references('id')
+                  ->on('penghunis')
+                  ->onDelete('cascade');
         });
     }
 

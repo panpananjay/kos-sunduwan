@@ -12,12 +12,19 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('penghunis', function (Blueprint $table) {
-            $table->id();
+            $table->integerIncrements('id'); // INT UNSIGNED AUTO_INCREMENT
             $table->string('nama');
             $table->string('no_hp');
             
-            // Ini adalah tali penghubung ke tabel kamars!
-            $table->foreignId('kamar_id')->constrained('kamars')->onDelete('cascade');
+            // 1. Kolom user_id (Tipe INT UNSIGNED agar cocok dengan users.id)
+            $table->unsignedInteger('user_id')->nullable();
+            
+            // 2. Kolom kamar_id (Tipe INT UNSIGNED agar cocok dengan kamars.id)
+            $table->unsignedInteger('kamar_id');
+
+            // 3. Relasi Foreign Key
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->foreign('kamar_id')->references('id')->on('kamars')->onDelete('cascade');
             
             $table->timestamps();
         });
