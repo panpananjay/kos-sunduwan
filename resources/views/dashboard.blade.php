@@ -130,67 +130,83 @@
             @else
                 @if($penghuniKu)
                     
-                    @if($tagihanBulanIni && $tagihanBulanIni->status != 'lunas')
-                        <div class="mb-8 bg-gradient-to-r from-rose-500 to-orange-500 p-6 rounded-[2rem] shadow-lg shadow-rose-100 text-white flex flex-col md:flex-row items-center justify-between gap-4 animate-pulse-subtle">
-                            <div class="flex items-center gap-4">
-                                <span class="text-4xl">📢</span>
-                                <div>
-                                    <h4 class="font-black text-lg">Tagihan {{ $tagihanBulanIni->bulan }} Belum Lunas</h4>
-                                    <p class="text-rose-100 text-sm">
-                                        Segera lunasi tagihanmu sampai seminggu kedepan jika tidak mau kehilangan poin! (Poin saat ini: <strong>{{ $penghuniKu->poin }}</strong>)
+                {{-- NOTIFIKASI TAGIHAN --}}
+                @if($tagihanBulanIni && $tagihanBulanIni->status != 'lunas')
+                    <div class="mb-8 bg-gradient-to-r from-rose-500 to-orange-500 rounded-[2rem] p-5 md:p-8 text-white shadow-lg shadow-rose-100/50 relative overflow-hidden group animate-pulse-subtle">
+                        {{-- Aksen Glassmorphism --}}
+                        <div class="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
+                        
+                        <div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                            <div class="flex items-center gap-4 md:gap-6 w-full">
+                                {{-- Icon Box --}}
+                                <div class="flex-none w-14 h-14 md:w-16 md:h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl md:text-3xl shadow-inner border border-white/30">
+                                    🔔
+                                </div>
+                                
+                                <div class="flex-1 min-w-0">
+                                    <h4 class="font-black text-base md:text-xl leading-tight tracking-tight truncate">
+                                        Tagihan {{ $tagihanBulanIni->bulan }} Belum Lunas
+                                    </h4>
+                                    <p class="text-rose-100 text-[10px] md:text-xs font-semibold uppercase tracking-wider mt-1 opacity-90">
+                                        Sisa Waktu Pembayaran:
                                     </p>
-                                    <div class="flex items-center mt-1">
-                                        <div id="countdown-timer" class="flex items-center gap-2 font-mono text-xl md:text-2xl font-bold tracking-widest text-white/90 drop-shadow-sm">
-                                            <span class="text-[10px] font-light animate-pulse tracking-normal">LOAD...</span>
-                                        </div>
+                                    {{-- Timer Digital --}}
+                                    <div id="countdown-timer" class="flex items-center gap-1.5 font-mono text-lg md:text-2xl font-black text-white drop-shadow-sm mt-0.5">
+                                        <span id="timer-val" class="tracking-widest">00 : 00 : 00 : 00</span>
                                     </div>
                                 </div>
                             </div>
-                            <a href="{{ route('tagihan.show', $tagihanBulanIni->id) }}" class="bg-white text-rose-600 font-black px-6 py-3 rounded-xl hover:bg-rose-50 transition-all shadow-md text-center w-full md:w-auto">
-                                Bayar Rp {{ number_format($tagihanBulanIni->jumlah_tagihan, 0, ',', '.') }}
-                            </a>
+
+                            {{-- Tombol: Rapi & Tidak Terlalu Lebar --}}
+                            <div class="w-full md:w-auto md:ml-auto">
+                                <a href="{{ route('tagihan.index') }}" class="block w-full md:min-w-[180px] md:max-w-[220px] bg-white text-rose-600 font-extrabold px-8 py-3.5 md:py-4 rounded-xl md:rounded-2xl hover:bg-rose-50 hover:scale-105 active:scale-95 transition-all text-sm md:text-base text-center shadow-md whitespace-nowrap">
+                                    CEK TAGIHAN SAYA
+                                </a>
+                            </div>
                         </div>
+                    </div>
 
-                        <script>
-                            document.addEventListener('DOMContentLoaded', function() {
-                                const timerDisplay = document.getElementById('countdown-timer');
-                                if (!timerDisplay) return;
+                    {{-- Script Timer --}}
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const timerVal = document.getElementById('timer-val');
+                            if (!timerVal) return;
 
-                                const createdDate = new Date("{{ $tagihanBulanIni->created_at->toIso8601String() }}").getTime();
-                                const deadline = createdDate + (7 * 24 * 60 * 60 * 1000);
+                            const createdDate = new Date("{{ $tagihanBulanIni->created_at->toIso8601String() }}").getTime();
+                            const deadline = createdDate + (7 * 24 * 60 * 60 * 1000);
 
-                                const x = setInterval(function() {
-                                    const now = new Date().getTime();
-                                    const distance = deadline - now;
+                            const x = setInterval(function() {
+                                const now = new Date().getTime();
+                                const distance = deadline - now;
 
-                                    if (distance < 0) {
-                                        clearInterval(x);
-                                        timerDisplay.innerHTML = "<span class='text-sm uppercase tracking-widest'>Waktu Habis 🚨</span>";
-                                        return;
-                                    }
+                                if (distance < 0) {
+                                    clearInterval(x);
+                                    timerVal.innerHTML = "<span class='text-sm tracking-widest'>WAKTU HABIS 🚨</span>";
+                                    return;
+                                }
 
-                                    const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-                                    const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                    const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-                                    const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                                const d = Math.floor(distance / (1000 * 60 * 60 * 24));
+                                const h = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                                const s = Math.floor((distance % (1000 * 60)) / 1000);
 
-                                    // Format angka agar selalu 2 digit (misal: 05, 09)
-                                    const f = (num) => num.toString().padStart(2, '0');
+                                const pad = (n) => n.toString().padStart(2, '0');
+                                timerVal.innerHTML = `${pad(d)} : ${pad(h)} : ${pad(m)} : ${pad(s)}`;
+                            }, 1000);
+                        });
+                    </script>
 
-                                    // Format: 06 : 23 : 33 : 40 (Sangat Clean & Elegan)
-                                    timerDisplay.innerHTML = `
-                                        <span>${f(days)}</span>
-                                        <span class="text-xl opacity-40 font-light">:</span>
-                                        <span>${f(hours)}</span>
-                                        <span class="text-xl opacity-40 font-light">:</span>
-                                        <span>${f(minutes)}</span>
-                                        <span class="text-xl opacity-40 font-light animate-none">:</span>
-                                        <span class="text-rose-200">${f(seconds)}</span>
-                                    `;
-                                }, 1000);
-                            });
-                        </script>
-                    @endif
+                    {{-- Style Efek Semula --}}
+                    <style>
+                        @keyframes pulse-subtle { 
+                            0%, 100% { transform: scale(1); } 
+                            50% { transform: scale(1.01); } 
+                        }
+                        .animate-pulse-subtle { 
+                            animation: pulse-subtle 3s infinite ease-in-out; 
+                        }
+                    </style>
+                @endif
 
                     <div class="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100 mb-8 flex flex-col md:flex-row items-center gap-6 relative overflow-hidden">
                         <div class="w-24 h-24 sm:w-28 sm:h-28 bg-gradient-to-tr from-rose-500 to-fuchsia-600 rounded-full flex items-center justify-center text-white text-4xl shadow-lg border-4 border-white relative z-10 flex-shrink-0">👩🏻</div>

@@ -9,7 +9,13 @@ use App\Http\Controllers\TagihanController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PengaduanController;
 
-// 1. RUTE PUBLIK (Bisa diakses tanpa login)
+/*
+|--------------------------------------------------------------------------
+| Web Routes - SISTEM MANAJEMEN KOS SUNDUWAN
+|--------------------------------------------------------------------------
+*/
+
+// --- 1. RUTE PUBLIK (Bisa diakses tanpa login) ---
 Route::get('/', function () {
     $kamarKosong = Kamar::where('status', 'kosong')->get();
     return view('welcome', compact('kamarKosong'));
@@ -20,57 +26,55 @@ Route::get('/kamar-detail/{id}', function ($id) {
     return view('kamar_detail', compact('kamar'));
 })->name('kamar.detail.public');
 
-// 2. RUTE WEBHOOK MIDTRANS (PENTING: Harus di luar middleware auth)
-// Agar server Midtrans bisa kirim laporan pembayaran otomatis
+
+// --- 2. WEBHOOK MIDTRANS (PENTING: Di luar middleware Auth) ---
+// Server Midtrans akan mengirim laporan pembayaran otomatis ke sini
 Route::post('/midtrans-callback', [TagihanController::class, 'callback'])->name('midtrans.callback');
 
-// 3. RUTE DASHBOARD (Login & Verified)
+
+// --- 3. RUTE DASHBOARD (Wajib Login) ---
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
-// ===============================================================
-// ZONA 1: BISA DIAKSES OLEH SEMUA YANG LOGIN (ADMIN & ANAK KOS)
-// ===============================================================
+
+// --- 4. ZONA USER LOGIN (Admin & Penghuni) ---
 Route::middleware('auth')->group(function () {
-    // Pengaturan Profil
+    
+    // Profile Management
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // Rute Tagihan (Anak Kos & Admin)
+    // Fitur Tagihan & Midtrans (SUDAH SIMPEL TANPA DETAIL/SHOW)
     Route::get('/tagihan', [TagihanController::class, 'index'])->name('tagihan.index');
-    Route::get('/tagihan/{id}', [TagihanController::class, 'show'])->name('tagihan.show');
-    
-    // PEMBAYARAN MIDTRANS (Trigger Token)
-    Route::post('/tagihan/{id}/bayar', [TagihanController::class, 'bayar'])->name('tagihan.bayar');
+    Route::post('/tagihan/{id}/bayar', [TagihanController::class, 'bayar'])->name('tagihan.bayar'); 
 
-    // Rute Pengaduan
+    // Fitur Pengaduan
     Route::get('/pengaduan', [PengaduanController::class, 'index'])->name('pengaduan.index');
     Route::get('/pengaduan/buat', [PengaduanController::class, 'create'])->name('pengaduan.create');
     Route::post('/pengaduan', [PengaduanController::class, 'store'])->name('pengaduan.store');
     Route::delete('/pengaduan/{pengaduan}', [PengaduanController::class, 'destroy'])->name('pengaduan.destroy');
 });
 
-// ===============================================================
-// ZONA 2: KHUSUS ADMIN SAJA (CheckAdmin Middleware)
-// ===============================================================
+
+// --- 5. ZONA KHUSUS ADMIN (Middleware CheckAdmin) ---
 Route::middleware(['auth', \App\Http\Middleware\CheckAdmin::class])->group(function () {
     
-    // Kelola Kamar
+    // Kelola Data Master Kamar
     Route::resource('kamar', KamarController::class)->except(['show']);
 
-    // Kelola Penghuni
+    // Kelola Data Penghuni
     Route::resource('penghuni', PenghuniController::class)->except(['show']);
     Route::post('/penghuni/{id}/reset-password', [PenghuniController::class, 'resetPassword'])->name('penghuni.reset_password');
 
-    // Fitur Tagihan Khusus Admin
+    // Fitur Manajemen Tagihan Admin
     Route::post('/tagihan/generate', [TagihanController::class, 'generate'])->name('tagihan.generate');
     Route::patch('/tagihan/{id}/verifikasi', [TagihanController::class, 'verifikasi'])->name('tagihan.verifikasi');
     Route::post('/tagihan/{id}/tolak', [TagihanController::class, 'tolak'])->name('tagihan.tolak');
     Route::delete('/tagihan/{id}', [TagihanController::class, 'destroy'])->name('tagihan.destroy');
 
-    // Respon Pengaduan
+    // Respon Pengaduan oleh Admin
     Route::patch('/pengaduan/{id}/respon', [PengaduanController::class, 'respon'])->name('pengaduan.respon');
 });
 

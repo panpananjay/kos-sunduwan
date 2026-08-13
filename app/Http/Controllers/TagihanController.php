@@ -16,7 +16,6 @@ class TagihanController extends Controller
 {
     public function __construct()
     {
-        // Set konfigurasi Midtrans
         Config::$serverKey = env('MIDTRANS_SERVER_KEY');
         Config::$isProduction = env('MIDTRANS_IS_PRODUCTION', false);
         Config::$isSanitized = true;
@@ -29,7 +28,8 @@ class TagihanController extends Controller
         $query = Tagihan::with('penghuni.kamar')->latest();
 
         if ($user->role == 'admin') {
-            $currentNotifCount = Tagihan::where('status', 'menunggu_verifikasi')->count();
+            // Notifikasi admin sekarang hitung yang bener-bener belum bayar saja
+            $currentNotifCount = Tagihan::where('status', 'belum_bayar')->count();
             session(['last_seen_admin_notif' => $currentNotifCount]);
         } else {
             $penghuni = Penghuni::where('user_id', $user->id)->first();
@@ -38,18 +38,15 @@ class TagihanController extends Controller
             }
         }
 
+        // Fitur Pencarian
         if ($request->filled('cari')) {
             $cari = strtoupper(trim($request->cari));
-            if (str_starts_with($cari, 'INV-')) {
-                $idAsli = (int) substr($cari, 10);
-                $query->where('id', $idAsli);
-            } else {
-                $query->whereHas('penghuni', function($q) use ($cari) {
-                    $q->where('nama', 'like', "%{$cari}%");
-                });
-            }
+            $query->whereHas('penghuni', function($q) use ($cari) {
+                $q->where('nama', 'like', "%{$cari}%");
+            });
         }
 
+        // Filter
         if ($request->filled('bulan')) $query->where('bulan', $request->bulan);
         if ($request->filled('tahun')) $query->where('tahun', $request->tahun);
         if ($request->filled('status')) $query->where('status', $request->status);
@@ -58,15 +55,15 @@ class TagihanController extends Controller
         return view('tagihan.index', compact('tagihans'));
     }
 
-    // METHOD BARU: INTEGRASI MIDTRANS
+    // --- INTEGRASI MIDTRANS ---
+
     public function bayar($id)
     {
         $tagihan = Tagihan::with('penghuni')->findOrFail($id);
 
-        // Buat parameter transaksi untuk Midtrans
         $params = [
             'transaction_details' => [
-                'order_id' => 'INV-' . date('Ym') . $tagihan->id . '-' . time(),
+                'order_id' => 'INV-' . $tagihan->id . '-' . time(),
                 'gross_amount' => (int) $tagihan->jumlah_tagihan,
             ],
             'customer_details' => [
@@ -91,24 +88,68 @@ class TagihanController extends Controller
         }
     }
 
+    public function callback(Request $request)
+    {
+        $serverKey = env('MIDTRANS_SERVER_KEY');
+        $hashed = hash("sha512", $request->order_id . $request->status_code . $request->gross_amount . $serverKey);
+
+        if ($hashed == $request->signature_key) {
+            if ($request->transaction_status == 'capture' || $request->transaction_status == 'settlement') {
+                $orderIdParts = explode('-', $request->order_id);
+                $tagihanId = $orderIdParts[1];
+
+                $tagihan = Tagihan::find($tagihanId);
+                if ($tagihan && $tagihan->status != 'lunas') {
+                    $this->prosesPelunasanOtomatis($tagihan);
+                }
+            }
+        }
+        return response()->json(['status' => 'success']);
+    }
+
+    private function prosesPelunasanOtomatis($tagihan)
+    {
+        $tagihan->update(['status' => 'lunas', 'catatan' => null]);
+
+        // 1. Logika Poin Kedisiplinan
+        $selisihHari = Carbon::now()->diffInDays($tagihan->created_at);
+        $poin = ($selisihHari <= 7) ? 50 : -50;
+        $tagihan->penghuni->increment('poin', $poin);
+
+        // 2. Generate Invoice Image
+        $this->generateInvoiceImage($tagihan);
+
+        // 3. Kirim WhatsApp via Fonnte
+        $this->sendWhatsApp($tagihan->penghuni->no_hp, "Halo *{$tagihan->penghuni->nama}*! Pembayaran tagihan periode {$tagihan->bulan} {$tagihan->tahun} telah LUNAS. Terima kasih! ✨");
+    }
+
+    private function generateInvoiceImage($tagihan)
+    {
+        $templatePath = public_path('images/template_invoice.jpg');
+        if (!file_exists($templatePath)) return;
+
+        $img = Image::read($templatePath)->scale(width: 800);
+        $fontBold = public_path('fonts/Montserrat-Bold.ttf');
+        
+        $img->text(strtoupper($tagihan->penghuni->nama), 70, 315, function($font) use ($fontBold) {
+            $font->file($fontBold); $font->size(28); $font->color('#1e293b');
+        });
+        
+        // Simpan ke storage
+        $namaFile = 'Invoice_' . $tagihan->id . '.png';
+        Storage::disk('public')->put('invoices/' . $namaFile, (string) $img->encodeByExtension('png'));
+    }
+
+    // --- MANAJEMEN TAGIHAN ADMIN ---
+
     public function generate(Request $request)
     {
-        \Carbon\Carbon::setLocale('id');
-        $bulan = $request->input('bulan', \Carbon\Carbon::now()->translatedFormat('F'));
-        $tahun = $request->input('tahun', \Carbon\Carbon::now()->year);
+        Carbon::setLocale('id');
+        $bulan = $request->input('bulan', Carbon::now()->translatedFormat('F'));
+        $tahun = $request->input('tahun', Carbon::now()->year);
 
         $penghunis = Penghuni::whereNotNull('kamar_id')->with('kamar')->get();
-        
-        if ($penghunis->isEmpty()) {
-            return redirect()->back()->with('error', "Gagal! Data penghuni kosong atau belum ada yang punya kamar.");
-        }
-
         $jumlahTerkirim = 0;
-        $daftarBulan = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-        ];
 
         foreach ($penghunis as $penghuni) {
             $tagihan = Tagihan::where('penghuni_id', $penghuni->id)
@@ -116,9 +157,8 @@ class TagihanController extends Controller
                                 ->where('tahun', $tahun)
                                 ->first();
 
-            if ($tagihan && in_array($tagihan->status, ['lunas', 'menunggu_verifikasi'])) {
-                continue; 
-            }
+            // Cek jika sudah lunas
+            if ($tagihan && $tagihan->status == 'lunas') continue;
 
             if (!$tagihan) {
                 $tagihan = Tagihan::create([
@@ -132,126 +172,24 @@ class TagihanController extends Controller
 
             $nominal = number_format($tagihan->jumlah_tagihan, 0, ',', '.');
             $pesan = "*--- NOTIFIKASI TAGIHAN KOS ---*\n\n" .
-                    "Halo *{$penghuni->nama}* 👋\n" .
-                    "Informasi tagihan periode *{$bulan} {$tahun}* sudah terbit.\n\n" .
-                    "💰 Total: *Rp {$nominal}*\n" .
-                    "📌 Status: *BELUM BAYAR*\n\n" .
-                    "Silakan melakukan pembayaran langsung melalui aplikasi (Midtrans) atau unggah bukti transfer. ✨";
-
+                     "Halo *{$penghuni->nama}* 👋\n" .
+                     "Tagihan periode *{$bulan} {$tahun}* sudah terbit.\n" .
+                     "💰 Total: *Rp {$nominal}*\n\n" .
+                     "Silakan lakukan pembayaran melalui aplikasi. ✨";
+            
             $this->sendWhatsApp($penghuni->no_hp, $pesan);
             $jumlahTerkirim++;
         }
 
-        return redirect()->route('tagihan.index')->with('success', "Berhasil mengirimkan {$jumlahTerkirim} notifikasi tagihan.");
-    }
-
-    public function show($id)
-    {
-        $tagihan = Tagihan::with('penghuni.kamar')->findOrFail($id);
-        $user = auth()->user();
-        if ($user->role == 'penghuni' && $tagihan->penghuni->user_id != $user->id) abort(403);
-        return view('tagihan.show', compact('tagihan'));
-    }
-
-    public function upload(Request $request, $id)
-    {
-        $request->validate(['bukti_bayar' => 'required|image|mimes:jpeg,png,jpg|max:2048']);
-        $tagihan = Tagihan::findOrFail($id);
-        $path = $request->file('bukti_bayar')->store('bukti_pembayaran', 'public');
-        
-        $tagihan->update([
-            'bukti_bayar' => $path, 
-            'status' => 'menunggu_verifikasi',
-            'catatan' => null 
-        ]);
-        
-        return redirect()->back()->with('success', 'Bukti berhasil diunggah! Mohon menunggu diverifikasi oleh admin.. ');
+        return redirect()->route('tagihan.index')->with('success', "Berhasil generate {$jumlahTerkirim} tagihan.");
     }
 
     public function verifikasi($id)
     {
-        $tagihan = Tagihan::with('penghuni.kamar')->findOrFail($id);
-        if (auth()->user()->role != 'admin') abort(403);
-
-        $tagihan->update([
-            'status' => 'lunas',
-            'catatan' => null
-        ]);
-
-        // LOGIKA GAMIFIKASI POIN (TETAP DIJAGA)
-        $tanggalTerbit = $tagihan->created_at;
-        $tanggalBayar = \Carbon\Carbon::now();
-        $selisihHari = $tanggalBayar->diffInDays($tanggalTerbit);
-
-        if ($selisihHari <= 7) {
-            $poin_tambahan = 50;
-            $teks_gamifikasi = 'TEPAT WAKTU! Anda mendapatkan +50 Poin Kedisiplinan';
-            $warna_teks_gamifikasi = '#059669'; 
-            $warna_border_gamifikasi = '#6ee7b7'; 
-            $warna_bg_gamifikasi = '#ecfdf5'; 
-        } else {
-            $poin_tambahan = -50;
-            $teks_gamifikasi = 'TERLAMBAT! Anda terkena -50 Poin Kedisiplinan';
-            $warna_teks_gamifikasi = '#e11d48'; 
-            $warna_border_gamifikasi = '#fda4af'; 
-            $warna_bg_gamifikasi = '#fff1f2'; 
-        }
-
-        $tagihan->penghuni->increment('poin', $poin_tambahan);
-        $penghuni = $tagihan->penghuni->fresh();
-
-        // LOGIKA GENERATE INVOICE IMAGE (TETAP DIJAGA)
-        $templatePath = public_path('images/template_invoice.jpg');
-        if (!file_exists($templatePath)) {
-            return redirect()->back()->with('error', 'Template invoice tidak ditemukan.');
-        }
-        
-        $img = Image::read($templatePath)->scale(width: 800);
-        $fontBold = public_path('fonts/Montserrat-Bold.ttf');
-        $fontReg  = public_path('fonts/Montserrat-Regular.ttf');
-        
-        // ... (Logika penulisan teks pada image tetap sama seperti sebelumnya) ...
-        $img->text(strtoupper($penghuni->nama), 70, 315, function($font) use ($fontBold) {
-            $font->file($fontBold); $font->size(28); $font->color('#1e293b');
-        });
-        // (Sengaja gue persingkat di sini agar tidak kepanjangan, intinya semua baris $img->text lo aman)
-        
-        // Simpan Invoice
-        $namaFile = 'Invoice_' . $tagihan->id . '.png';
-        $pathImage = 'invoices/' . $namaFile;
-        Storage::disk('public')->put($pathImage, (string) $img->encodeByExtension('png'));
-
-        // Notifikasi WA Selesai Bayar
-        $this->sendWhatsApp($penghuni->no_hp, "Halo *{$penghuni->nama}*! Terimakasih telah melunasi tagihan kos periode {$tagihan->bulan}. Invoice sudah tersedia di aplikasi!✨");
-
-        return redirect()->route('tagihan.index')->with('success', 'Verifikasi Pembayaran Berhasil! ✅');
-    }
-
-    public function tolak(Request $request, $id)
-    {
-        if (auth()->user()->role != 'admin') abort(403);
-        $request->validate(['catatan' => 'required|string|max:255']);
+        // Tetap ada buat jaga-jaga kalau admin mau melunasi manual tanpa lewat Midtrans
         $tagihan = Tagihan::findOrFail($id);
-
-        $tagihan->update([
-            'status' => 'belum_bayar',
-            'catatan' => $request->catatan,
-            'bukti_bayar' => null, 
-        ]);
-
-        $this->sendWhatsApp($tagihan->penghuni->no_hp, "*--- PEMBAYARAN DITOLAK ---*\n\nAlasan: {$request->catatan}");
-        return redirect()->route('tagihan.index')->with('success', 'Pembayaran ditolak.');
-    }
-
-    private function sendWhatsApp($target, $message)
-    {
-        return Http::withHeaders([
-            'Authorization' => env('FONNTE_TOKEN'),
-        ])->post('https://api.fonnte.com/send', [
-            'target'      => $target,
-            'message'     => $message,
-            'countryCode' => '62', 
-        ]);
+        $this->prosesPelunasanOtomatis($tagihan);
+        return redirect()->route('tagihan.index')->with('success', 'Tagihan berhasil dilunasi manual! ✅');
     }
 
     public function destroy($id)
@@ -260,5 +198,19 @@ class TagihanController extends Controller
         Storage::disk('public')->delete('invoices/Invoice_' . $tagihan->id . '.png');
         $tagihan->delete();
         return redirect()->route('tagihan.index')->with('success', 'Data tagihan berhasil dihapus!');
+    }
+
+    private function sendWhatsApp($target, $message)
+    {
+        try {
+            return Http::withHeaders(['Authorization' => env('FONNTE_TOKEN')])
+                ->post('https://api.fonnte.com/send', [
+                    'target' => $target,
+                    'message' => $message,
+                    'countryCode' => '62',
+                ]);
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 }
