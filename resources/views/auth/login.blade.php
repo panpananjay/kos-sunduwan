@@ -55,7 +55,7 @@
 
         <x-auth-session-status class="mb-4 text-center font-bold text-emerald-600 bg-emerald-50 p-3 rounded-xl" :status="session('status')" />
 
-        <form method="POST" action="{{ route('login') }}">
+        <form id="loginForm" method="POST" action="{{ route('login') }}">
             @csrf
 
             <div class="mb-5">
@@ -64,7 +64,15 @@
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <span class="text-slate-400">👤</span>
                     </div>
-                    <input id="username" type="text" name="username" value="{{ old('username') }}" required autofocus placeholder="Masukkan username" class="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 text-slate-900 font-medium rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-transparent transition duration-300 outline-none shadow-sm">
+                    <input id="username" 
+                           type="text" 
+                           name="username" 
+                           value="{{ old('username') }}" 
+                           required 
+                           autofocus 
+                           autocomplete="username"
+                           placeholder="Masukkan username" 
+                           class="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 text-slate-900 font-medium rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-transparent transition duration-300 outline-none shadow-sm">
                 </div>
                 <x-input-error :messages="$errors->get('username')" class="mt-2 text-xs text-rose-500 font-bold" />
             </div>
@@ -129,6 +137,7 @@
         </form>
     </div>
 
+    {{-- Script PWA Service Worker --}}
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -139,16 +148,41 @@
         }
     </script>
 
+    {{-- Script Lupa Sandi --}}
     <script>
     function reportForgotPassword() {
-        // Ambil nama dari input username
         const username = document.getElementById('username').value || '(Nama Penghuni)';
         const phone = "6287876904661";
         const message = `Halo pak, saya ${username} lupa sandi akun kos saya. Mohon dibantu untuk direset`;
-        
-        // Buka WhatsApp dengan pesan tersebut
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
     }
+    </script>
+
+    {{-- SCRIPT REMEMBER ME (AUTO-FILL USERNAME) --}}
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const usernameInput = document.getElementById("username");
+        const rememberCheckbox = document.getElementById("remember_me");
+        const loginForm = document.getElementById("loginForm");
+
+        // 1. Cek apakah ada username tersimpan di localStorage
+        const savedUsername = localStorage.getItem("sunduwan_saved_username");
+        if (savedUsername && usernameInput) {
+            usernameInput.value = savedUsername;
+            rememberCheckbox.checked = true;
+        }
+
+        // 2. Simpan username ke localStorage saat tombol Login ditekan (jika centang "Ingat saya")
+        if (loginForm) {
+            loginForm.addEventListener("submit", function () {
+                if (rememberCheckbox.checked) {
+                    localStorage.setItem("sunduwan_saved_username", usernameInput.value);
+                } else {
+                    localStorage.removeItem("sunduwan_saved_username");
+                }
+            });
+        }
+    });
     </script>
 </body>
 </html>
