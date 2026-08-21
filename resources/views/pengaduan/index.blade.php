@@ -60,7 +60,12 @@
                                         <h4 class="text-lg font-black text-slate-800 leading-tight">{{ $laporan->judul }}</h4>
                                         <p class="text-[11px] font-bold text-slate-400 mt-1.5 uppercase tracking-widest">
                                             @if(auth()->user()->role == 'admin')
-                                                <span class="text-rose-500">{{ $laporan->user->name }}</span> • 
+                                                <span class="text-rose-500">{{ $laporan->user->name }}</span> 
+                                                <span class="text-slate-400"> • </span>
+                                                <span class="text-rose-500">
+                                                    {{ $laporan->user->penghuni->kamar->nomor_kamar ?? '-' }}
+                                                </span>
+                                                <span class="text-slate-400"> • </span>
                                             @endif
                                             {{ $laporan->created_at->format('d M Y') }}
                                         </p>

@@ -256,12 +256,12 @@
                 </h2>
 
                 <p class="text-sm sm:text-base text-slate-500 font-medium leading-relaxed">
-                    Berlokasi di Jalan Ir. Ida Bagus Oka Gang Sundu No.1, Panjer. Akses sangat mudah dan dekat dengan berbagai fasilitas umum serta wilayah kampus.
-                </p>
+                    Berlokasi di Jalan Ir. Ida Bagus Oka Gang Sundu No.1, Panjer. Akses sangat mudah dan dekat dengan berbagai fasilitas umum serta wilayah pendidikan.
+                </p> 
             </div>
 
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch mt-10 sm:mt-14">
 
                 <div class="lg:col-span-2 h-[350px] sm:h-[450px] rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 relative">
                     <iframe
@@ -368,11 +368,10 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js')
-                    .then(reg => console.log('Sunduwan PWA Guest: Aktif!', reg))
-                    .catch(err => console.error('PWA Gagal:', err));
+                    .then(reg => console.log('Shortcut Aktif!', reg))
+                    .catch(err => console.error('Shortcut Gagal:', err));
             });
         }
     </script>
-
 </body>
 </html>

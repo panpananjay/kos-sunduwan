@@ -23,7 +23,9 @@ use App\Http\Controllers\VoucherController;
 // ==========================================================================
 
 Route::get('/', function () {
-    $kamarKosong = Kamar::where('status', 'kosong')->get();
+    $kamarKosong = Kamar::where('status', 'kosong')
+        ->orderBy('nomor_kamar', 'asc')
+        ->get();
 
     return view('welcome', compact('kamarKosong'));
 });

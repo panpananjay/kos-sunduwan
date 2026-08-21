@@ -10,8 +10,8 @@ class KamarController extends Controller
 {
     public function index()
     {
-        // Ambil semua data kamar dari database
-        $kamars = Kamar::all();
+        // Ambil semua data kamar dari database, diurutkan berdasarkan nomor kamar
+        $kamars = Kamar::orderBy('nomor_kamar', 'asc')->get();
 
         // Tampilkan data kamar ke view
         return view('kamar.index', compact('kamars'));
