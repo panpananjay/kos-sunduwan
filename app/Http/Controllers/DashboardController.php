@@ -67,6 +67,7 @@ class DashboardController extends Controller
             $pengaduanTerakhir = null;
             $totalLunas = 0;
             $level = 'Penghuni Baru 🌱'; // Nilai default
+            $tanggalMasuk = null;
 
             if ($penghuniKu) {
                 // Cari tagihan bulan ini
@@ -85,6 +86,27 @@ class DashboardController extends Controller
                 $totalLunas = Tagihan::where('penghuni_id', $penghuniKu->id)
                     ->where('status', 'lunas')
                     ->count();
+
+                // ==========================================
+                // CARI TANGGAL MASUK (dari tagihan LUNAS pertama)
+                // ==========================================
+                $daftarBulanUrut = [
+                    'Januari' => 1, 'Februari' => 2, 'Maret' => 3, 'April' => 4,
+                    'Mei' => 5, 'Juni' => 6, 'Juli' => 7, 'Agustus' => 8,
+                    'September' => 9, 'Oktober' => 10, 'November' => 11, 'Desember' => 12,
+                ];
+
+                $tagihanPertamaLunas = Tagihan::where('penghuni_id', $penghuniKu->id)
+                    ->where('status', 'lunas')
+                    ->get()
+                    ->sortBy(function ($tagihan) use ($daftarBulanUrut) {
+                        return $tagihan->tahun . str_pad($daftarBulanUrut[$tagihan->bulan] ?? 0, 2, '0', STR_PAD_LEFT);
+                    })
+                    ->first();
+
+                $tanggalMasuk = $tagihanPertamaLunas
+                    ? $tagihanPertamaLunas->bulan . ' ' . $tagihanPertamaLunas->tahun
+                    : null;
 
                 // ==========================================
                 // LOGIKA INDEKS KEDISIPLINAN (GAMIFIKASI)
@@ -106,7 +128,7 @@ class DashboardController extends Controller
 
             return view('dashboard', compact(
                 'penghuniKu', 'tagihanBulanIni', 'pengaduanTerakhir', 
-                'totalLunas', 'level', 'bulanIni', 'tahunIni'
+                'totalLunas', 'level', 'bulanIni', 'tahunIni', 'tanggalMasuk'
             ));
         }
     }

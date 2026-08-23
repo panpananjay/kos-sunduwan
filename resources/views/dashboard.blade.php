@@ -297,6 +297,13 @@
                                         {{ $penghuniKu->no_hp }}
                                     </strong>
                                 </div>
+
+                                <div>
+                                    📅 Sejak:
+                                    <strong class="text-slate-700">
+                                        {{ $tanggalMasuk ?? '-' }}
+                                    </strong>
+                                </div>
                             </div>
                         </div>
                     </div>
