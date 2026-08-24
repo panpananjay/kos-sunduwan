@@ -78,6 +78,7 @@
         }
     },
     "config": {
+        "vendor-dir": "libs",
         "optimize-autoloader": true,
         "preferred-install": "dist",
         "sort-packages": true,
