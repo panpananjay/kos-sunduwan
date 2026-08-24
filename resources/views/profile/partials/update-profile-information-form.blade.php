@@ -22,7 +22,7 @@
         <div>
             <x-input-label
                 for="name"
-                :value="__('Nama Lengkap')"
+                :value="__('Nama (DIKUNCI)')"
                 class="font-bold text-slate-700 text-xs uppercase tracking-wider mb-2"
             />
 
