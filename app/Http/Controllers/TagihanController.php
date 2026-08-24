@@ -303,7 +303,7 @@ class TagihanController extends Controller
             $font->file($fontBold); $font->size(14); $font->color($colorGray); $font->align('right'); 
         });
 
-        $img->text('SEWA KOS', 90, 630, function($font) use ($fontBold, $colorDark) { 
+        $img->text('Sewa Kos Putri Sunduwan', 90, 630, function($font) use ($fontBold, $colorDark) { 
             $font->file($fontBold); $font->size(18); $font->color($colorDark); 
         });
         $img->text($tagihan->bulan . ' ' . $tagihan->tahun, 400, 630, function($font) use ($fontReg, $colorDark) { 
@@ -367,6 +367,16 @@ class TagihanController extends Controller
         if (!empty($penghuni->no_hp)) {
             $this->sendWhatsApp($penghuni->no_hp, $pesanSukses);
         }
+    }
+
+    public function verifikasi($id)
+    {
+        $tagihan = Tagihan::findOrFail($id);
+        if ($tagihan->status != 'lunas') {
+            $this->prosesPelunasanOtomatis($tagihan, 'manual');
+            return redirect()->route('tagihan.index')->with('success', 'Selamat! Pembayaran berhasil diverifikasi manual dan invoice telah diterbitkan.');
+        }
+        return redirect()->route('tagihan.index');
     }
 
     public function lunasiManual($id)

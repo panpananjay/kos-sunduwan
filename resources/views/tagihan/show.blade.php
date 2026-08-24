@@ -5,7 +5,7 @@
         </h2>
     </x-slot>
 
-    <div class="py-12" x-data="{ openTolak: false }">
+    <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             
             @if(session('success'))
@@ -24,15 +24,15 @@
                 <div class="mb-6 bg-rose-50 border-2 border-rose-200 p-5 rounded-3xl flex gap-4 items-center animate-bounce-short">
                     <div class="bg-rose-500 text-white p-2 rounded-full text-xl">⚠️</div>
                     <div>
-                        <h4 class="font-black text-rose-700">Pembayaran Ditolak Admin</h4>
+                        <h4 class="font-black text-rose-700">Catatan Pembayaran</h4>
                         <p class="text-rose-600 font-medium italic">"{{ $tagihan->catatan }}"</p>
-                        <p class="text-xs text-rose-400 mt-1">*Silakan perbaiki dan upload kembali bukti bayar yang sah.</p>
                     </div>
                 </div>
             @endif
 
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-3xl border border-gray-100 flex flex-col md:flex-row">
                 
+                {{-- Kolom Kiri: Informasi Tagihan --}}
                 <div class="p-8 md:w-1/2 border-b md:border-b-0 md:border-r border-gray-100 bg-gray-50 flex flex-col justify-between">
                     <div>
                         <h3 class="text-2xl font-black text-gray-800 mb-6 flex items-center gap-2">
@@ -71,81 +71,60 @@
 
                         @if($tagihan->status != 'lunas')
                             <div class="bg-white p-5 rounded-xl shadow-sm border border-indigo-50 text-sm">
-                                <p class="font-bold text-gray-700 mb-2">📌 Instruksi Pembayaran:</p>
-                                <p class="text-gray-600 mb-1">Silakan transfer sesuai nominal ke rekening berikut:</p>
-                                <div class="bg-gray-50 p-3 rounded-lg mt-2 font-mono text-lg font-bold text-gray-800 tracking-wider border border-gray-200">
-                                    BRI - 1234567890<br>
-                                    <span class="text-sm font-normal text-gray-500 font-sans">a.n. Wayan Ediana</span>
-                                </div>
+                                <p class="font-bold text-gray-700 mb-1">📌 Pembayaran Otomatis Midtrans:</p>
+                                <p class="text-gray-600">Pembayaran diproses secara instant melalui Transfer Bank (Virtual Account), QRIS, atau E-Wallet.</p>
                             </div>
                         @endif
                     </div>
                 </div>
 
-                <div class="p-8 md:w-1/2 bg-white flex flex-col justify-center">
-                    <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        📸 Bukti Transfer
-                    </h3>
+                {{-- Kolom Kanan: Aksi Pembayaran / Invoice --}}
+                <div class="p-8 md:w-1/2 bg-white flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                            💳 Pembayaran
+                        </h3>
 
-                    @if($tagihan->bukti_bayar)
-                        <div class="border border-gray-200 shadow-sm rounded-2xl overflow-hidden bg-gray-50 flex justify-center items-center h-64 mb-6 relative group">
-                            <img src="{{ asset('storage/' . $tagihan->bukti_bayar) }}" alt="Bukti Pembayaran" class="max-h-full max-w-full object-contain p-2 transition-transform duration-300 group-hover:scale-105 cursor-zoom-in" onclick="window.open(this.src)">
-                            <div class="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                🔍 Klik untuk perbesar
+                        @if($tagihan->status == 'lunas')
+                            <div class="bg-emerald-50 text-emerald-700 p-6 rounded-2xl text-center border border-emerald-200 mb-6">
+                                <div class="text-5xl mb-3">🎉</div>
+                                <h4 class="font-black text-xl mb-1">Pembayaran Telah Lunas!</h4>
+                                <p class="text-sm text-emerald-600 mb-5">Terima kasih atas pembayaran tepat waktu Anda.</p>
+
+                                <a href="{{ route('tagihan.unduh', $tagihan->id) }}" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 px-6 rounded-xl shadow-lg flex justify-center items-center gap-2 text-lg transition duration-200">
+                                    ⬇️ Unduh E-Invoice Resmi
+                                </a>
                             </div>
-                        </div>
 
-                        @if(auth()->user()->role == 'admin' && $tagihan->status == 'menunggu_verifikasi')
-                            <div class="flex flex-col gap-3">
-                                <form action="{{ route('tagihan.verifikasi', $tagihan->id) }}" method="POST">
-                                    @csrf
-                                    @method('PATCH')
-                                    <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 px-6 rounded-xl shadow-lg transform hover:-translate-y-1 transition duration-300 text-lg flex justify-center items-center gap-2">
-                                        ✅ Verifikasi & Lunas
+                        @elseif($tagihan->status == 'belum_bayar')
+                            @if(auth()->user()->role == 'penghuni')
+                                <div class="bg-indigo-50 p-8 rounded-3xl border-2 border-indigo-100 text-center">
+                                    <div class="text-5xl mb-4">💳</div>
+                                    <h4 class="text-xl font-black text-gray-800 mb-2">Bayar Tagihan Sekarang</h4>
+                                    <p class="text-sm text-gray-600 mb-6">Klik tombol di bawah untuk memilih pembayaran via QRIS, Virtual Account Bank, atau E-Wallet.</p>
+
+                                    <button id="pay-button" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 px-6 rounded-xl shadow-lg transform hover:-translate-y-0.5 transition duration-300 text-lg flex justify-center items-center gap-2">
+                                        🚀 Bayar Sekarang via Midtrans
                                     </button>
-                                </form>
-
-                                <button @click="openTolak = true" class="w-full bg-white border-2 border-rose-500 text-rose-500 hover:bg-rose-50 font-bold py-3 rounded-xl transition duration-300 flex justify-center items-center gap-2">
-                                    ❌ Tolak Pembayaran
-                                </button>
-                            </div>
-                        
-                        @elseif(auth()->user()->role == 'penghuni' && $tagihan->status == 'menunggu_verifikasi')
-                            <div class="bg-yellow-50 text-yellow-700 p-4 rounded-xl text-center border border-yellow-200 font-bold animate-pulse">
-                                ⏳ Bukti terkirim! Menunggu diverifikasi admin...
-                            </div>
-                        
-                        @elseif($tagihan->status == 'lunas')
-                            <div class="bg-emerald-50 text-emerald-700 p-4 rounded-xl text-center border border-emerald-200 font-black text-lg mb-4">
-                                🎉 Pembayaran Telah Lunas!
-                            </div>
-                            <a href="{{ asset('storage/invoices/Invoice_' . $tagihan->id . '.png') }}" download class="w-full bg-indigo-600 hover:bg-indigo-800 text-white font-black py-4 px-6 rounded-xl shadow-lg flex justify-center items-center gap-2 text-lg">
-                                ⬇️ Unduh Invoice
-                            </a>
-                        @endif
-
-                    @else
-                        @if(auth()->user()->role == 'penghuni')
-                            <form action="{{ route('tagihan.upload', $tagihan->id) }}" method="POST" enctype="multipart/form-data" class="bg-indigo-50 p-8 rounded-3xl border-2 border-indigo-200 border-dashed text-center transition hover:border-indigo-400">
-                                @csrf
-                                @method('PUT')
-                                <div class="mb-6">
-                                    <div class="text-4xl mb-4">📤</div>
-                                    <label class="block text-indigo-900 font-extrabold mb-2 text-lg">Upload Bukti Pembayaran</label>
-                                    <p class="text-sm text-gray-500 mb-4 font-italic">Format: JPG, JPEG, atau PNG</p>
-                                    <input type="file" name="bukti_bayar" class="w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-6 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer" required accept="image/*">
                                 </div>
-                                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-800 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition duration-300">
-                                    Kirim Bukti Pembayaran
-                                </button>
-                            </form>
-                        @else
-                            <div class="bg-gray-50 p-10 rounded-3xl border-2 border-gray-200 border-dashed flex flex-col items-center justify-center text-gray-400 h-64">
-                                <span class="text-5xl mb-3 grayscale opacity-50">📭</span>
-                                <p class="font-medium text-center font-bold">Belum ada bukti pembayaran.</p>
+                            @else
+                                <div class="bg-gray-50 p-8 rounded-3xl border border-gray-200 text-center text-gray-400">
+                                    <div class="text-4xl mb-3">⏳</div>
+                                    <p class="font-semibold text-gray-600">Penghuni belum melakukan pembayaran.</p>
+                                </div>
+                            @endif
+                        @endif
+
+                        {{-- Menampilkan Bukti Bayar jika ada data riwayat manual terdahulu --}}
+                        @if($tagihan->bukti_bayar)
+                            <div class="mt-6 border border-gray-200 shadow-sm rounded-2xl overflow-hidden bg-gray-50 p-4">
+                                <p class="text-xs font-bold text-gray-500 mb-2">BUKTI BAYAR LAMA (MANUAL):</p>
+                                <div class="flex justify-center items-center h-48 relative group">
+                                    <img src="{{ asset('storage/' . $tagihan->bukti_bayar) }}" alt="Bukti Pembayaran" class="max-h-full max-w-full object-contain p-2 cursor-zoom-in" onclick="window.open(this.src)">
+                                </div>
                             </div>
                         @endif
-                    @endif
+                    </div>
 
                     <div class="mt-8 text-center">
                         <a href="{{ route('tagihan.index') }}" class="text-gray-500 hover:text-indigo-600 font-bold transition inline-flex items-center gap-1 bg-gray-100 hover:bg-indigo-50 px-4 py-2 rounded-lg text-sm">
@@ -153,24 +132,6 @@
                         </a>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <div x-show="openTolak" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" x-cloak x-transition>
-            <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl" @click.away="openTolak = false">
-                <h3 class="text-2xl font-black text-gray-800 mb-2">Tolak Pembayaran?</h3>
-                <p class="text-gray-500 mb-6 text-sm italic">Berikan alasan agar penghuni bisa memperbaiki kesalahannya.</p>
-                
-                <form action="{{ route('tagihan.tolak', $tagihan->id) }}" method="POST">
-                    @csrf
-                    <label class="block text-sm font-bold text-gray-700 mb-2">Alasan Penolakan:</label>
-                    <textarea name="catatan" rows="3" class="w-full border-gray-200 rounded-2xl focus:ring-rose-500 focus:border-rose-500 p-4 bg-gray-50 text-gray-800" placeholder="Contoh: Bukti tidak terbaca atau nominal kurang..." required></textarea>
-                    
-                    <div class="flex flex-col gap-3 mt-8">
-                        <button type="submit" class="w-full bg-rose-500 text-white font-bold py-4 rounded-2xl shadow-lg shadow-rose-100 hover:bg-rose-600 transition">Kirim Penolakan</button>
-                        <button type="button" @click="openTolak = false" class="text-gray-400 font-bold py-2 hover:text-gray-600 transition text-sm">Batalkan</button>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
@@ -184,14 +145,42 @@
         .animate-bounce-short { animation: bounce-short 2s infinite; }
     </style>
 
-    <script>
+    {{-- Script Integration Midtrans Snap --}}
+    <script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="{{ config('midtrans.client_key') }}"></script>
+    <script type="text/javascript">
         document.addEventListener('DOMContentLoaded', function() {
+            // Auto hide alert
             const alert = document.getElementById('success-alert');
             if (alert) {
                 setTimeout(() => {
                     alert.style.opacity = '0'; 
                     setTimeout(() => alert.remove(), 500); 
                 }, 4000);
+            }
+
+            // Event listener tombol bayar Midtrans
+            const payButton = document.getElementById('pay-button');
+            if (payButton) {
+                payButton.addEventListener('click', function () {
+                    @if(isset($tagihan->snap_token) && $tagihan->snap_token)
+                        window.snap.pay('{{ $tagihan->snap_token }}', {
+                            onSuccess: function(result){
+                                window.location.reload();
+                            },
+                            onPending: function(result){
+                                window.location.reload();
+                            },
+                            onError: function(result){
+                                alert("Pembayaran gagal!");
+                            },
+                            onClose: function(){
+                                alert('Anda menutup pop-up pembayaran sebelum selesai.');
+                            }
+                        });
+                    @else
+                        alert('Snap token tidak ditemukan. Silakan refresh halaman.');
+                    @endif
+                });
             }
         });
     </script>

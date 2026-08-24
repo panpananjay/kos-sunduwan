@@ -15,20 +15,23 @@ class Tagihan extends Model
         'tahun',
         'jumlah_tagihan',
         'status',
-        'bukti_bayar',
-        'catatan'
+        'payment_id',
+        'snap_token',
+        'payment_type',
+        'catatan',
     ];
 
+    /**
+     * Relasi ke data Penghuni
+     */
     public function penghuni()
     {
         return $this->belongsTo(Penghuni::class);
     }
 
-    public function tagihans()
-    {
-        return $this->hasMany(Tagihan::class);
-    }
-
+    /**
+     * Relasi ke data Voucher
+     */
     public function vouchers()
     {
         return $this->hasMany(Voucher::class, 'tagihan_id');

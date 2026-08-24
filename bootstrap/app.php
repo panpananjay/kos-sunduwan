@@ -15,14 +15,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Tetap mempertahankan fitur PWA lo
+        // Fitur PWA
         $middleware->web(append: [
             \App\Http\Middleware\PwaMiddleware::class,
         ]);
 
-        // TAMBAHAN: Kecualikan rute Midtrans agar tidak diblokir CSRF
+        // PERBAIKAN: Kecualikan rute Midtrans dari proteksi CSRF
         $middleware->validateCsrfTokens(except: [
-            '/midtrans-callback', 
+            'midtrans/callback',
+            'midtrans-callback',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
@@ -40,14 +41,18 @@ return Application::configure(basePath: dirname(__DIR__))
                         $view->with('jumlahPengaduan', $jumlah);
                     } else {
                         // Notif untuk Penghuni: 
-                        // 1. Tagihan yang belum lunas
-                        $notifTagihan = Tagihan::where('user_id', $user->id)
-                                              ->where('status', 'belum_bayar')->count();
+                        // PERBAIKAN: Relasi tagihan diambil via relasi penghuni (karena tabel tagihans menggunakan penghuni_id)
+                        $notifTagihan = Tagihan::whereHas('penghuni', function ($query) use ($user) {
+                                            $query->where('user_id', $user->id);
+                                        })
+                                        ->where('status', 'belum_bayar')
+                                        ->count();
                                               
-                        // 2. Balasan Pengaduan: Status 'diproses' tapi sudah ada jawaban admin
+                        // Balasan Pengaduan: Status 'diproses' tapi sudah ada jawaban admin
                         $notifPengaduanPenghuni = Pengaduan::where('user_id', $user->id)
-                                                          ->where('status', 'diproses')
-                                                          ->whereNotNull('tanggapan_admin')->count();
+                                                           ->where('status', 'diproses')
+                                                           ->whereNotNull('tanggapan_admin')
+                                                           ->count();
                         
                         $view->with('notifTagihan', $notifTagihan);
                         $view->with('notifPengaduanPenghuni', $notifPengaduanPenghuni);

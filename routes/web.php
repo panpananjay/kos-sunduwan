@@ -17,7 +17,6 @@ use App\Http\Controllers\VoucherController;
 |--------------------------------------------------------------------------
 */
 
-
 // ==========================================================================
 // 1. RUTE PUBLIK
 // ==========================================================================
@@ -38,7 +37,7 @@ Route::get('/kamar-detail/{id}', function ($id) {
 
 
 // ==========================================================================
-// 2. WEBHOOK MIDTRANS
+// 2. WEBHOOK MIDTRANS (TANPA CSRF)
 // ==========================================================================
 
 Route::post('/midtrans-callback', [TagihanController::class, 'callback'])
@@ -55,71 +54,31 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
 
 
 // ==========================================================================
-// 4. ZONA USER LOGIN
+// 4. ZONA USER LOGIN (PENGHUNI & ADMIN)
 // ==========================================================================
 
 Route::middleware('auth')->group(function () {
 
-    // ----------------------------------------------------------------------
     // Profile
-    // ----------------------------------------------------------------------
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    Route::get('/profile', [ProfileController::class, 'edit'])
-        ->name('profile.edit');
-
-    Route::patch('/profile', [ProfileController::class, 'update'])
-        ->name('profile.update');
-
-    Route::delete('/profile', [ProfileController::class, 'destroy'])
-        ->name('profile.destroy');
-
-
-    // ----------------------------------------------------------------------
     // Tagihan
-    // ----------------------------------------------------------------------
+    Route::get('/tagihan', [TagihanController::class, 'index'])->name('tagihan.index');
+    Route::post('/tagihan/{id}/bayar', [TagihanController::class, 'bayar'])->name('tagihan.bayar');
+    Route::get('/tagihan/{id}/unduh', [TagihanController::class, 'unduhInvoice'])->name('tagihan.unduh');
 
-    Route::get('/tagihan', [TagihanController::class, 'index'])
-        ->name('tagihan.index');
-
-    Route::get('/tagihan/{id}', [TagihanController::class, 'show'])
-        ->name('tagihan.show');
-
-    Route::post('/tagihan/{id}/bayar', [TagihanController::class, 'bayar'])
-        ->name('tagihan.bayar');
-
-    Route::get('/tagihan/{id}/unduh', [TagihanController::class, 'unduhInvoice'])
-        ->name('tagihan.unduh');
-
-
-    // ----------------------------------------------------------------------
     // Pengaduan
-    // ----------------------------------------------------------------------
+    Route::get('/pengaduan', [PengaduanController::class, 'index'])->name('pengaduan.index');
+    Route::get('/pengaduan/buat', [PengaduanController::class, 'create'])->name('pengaduan.create');
+    Route::post('/pengaduan', [PengaduanController::class, 'store'])->name('pengaduan.store');
+    Route::delete('/pengaduan/{pengaduan}', [PengaduanController::class, 'destroy'])->name('pengaduan.destroy');
 
-    Route::get('/pengaduan', [PengaduanController::class, 'index'])
-        ->name('pengaduan.index');
-
-    Route::get('/pengaduan/buat', [PengaduanController::class, 'create'])
-        ->name('pengaduan.create');
-
-    Route::post('/pengaduan', [PengaduanController::class, 'store'])
-        ->name('pengaduan.store');
-
-    Route::delete('/pengaduan/{pengaduan}', [PengaduanController::class, 'destroy'])
-        ->name('pengaduan.destroy');
-
-
-    // ----------------------------------------------------------------------
     // Poin & Voucher
-    // ----------------------------------------------------------------------
-
-    Route::get('/voucher', [VoucherController::class, 'index'])
-        ->name('voucher.index');
-
-    Route::post('/poin/tukar', [PoinController::class, 'tukarPoin'])
-        ->name('poin.tukar');
-
-    Route::post('/voucher/{id}/gunakan', [PoinController::class, 'gunakanVoucher'])
-        ->name('voucher.gunakan');
+    Route::get('/voucher', [VoucherController::class, 'index'])->name('voucher.index');
+    Route::post('/poin/tukar', [PoinController::class, 'tukarPoin'])->name('poin.tukar');
+    Route::post('/voucher/{id}/gunakan', [PoinController::class, 'gunakanVoucher'])->name('voucher.gunakan');
 });
 
 
@@ -132,29 +91,15 @@ Route::middleware([
     \App\Http\Middleware\CheckAdmin::class,
 ])->group(function () {
 
-    // ----------------------------------------------------------------------
     // Kelola Data Kamar
-    // ----------------------------------------------------------------------
+    Route::resource('kamar', KamarController::class)->except(['show']);
 
-    Route::resource('kamar', KamarController::class)
-        ->except(['show']);
-
-
-    // ----------------------------------------------------------------------
     // Kelola Data Penghuni
-    // ----------------------------------------------------------------------
-
-    Route::resource('penghuni', PenghuniController::class)
-        ->except(['show']);
-
+    Route::resource('penghuni', PenghuniController::class)->except(['show']);
     Route::post('/penghuni/{id}/reset-password', [PenghuniController::class, 'resetPassword'])
         ->name('penghuni.reset_password');
 
-
-    // ----------------------------------------------------------------------
     // Manajemen Tagihan Admin
-    // ----------------------------------------------------------------------
-
     Route::post('/tagihan/generate', [TagihanController::class, 'generate'])
         ->name('tagihan.generate');
 
@@ -164,11 +109,7 @@ Route::middleware([
     Route::delete('/tagihan/{id}', [TagihanController::class, 'destroy'])
         ->name('tagihan.destroy');
 
-
-    // ----------------------------------------------------------------------
     // Respon Pengaduan Admin
-    // ----------------------------------------------------------------------
-
     Route::patch('/pengaduan/{id}/respon', [PengaduanController::class, 'respon'])
         ->name('pengaduan.respon');
 });

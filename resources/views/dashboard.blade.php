@@ -15,7 +15,13 @@
             <div class="mb-8 mt-2 flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                     <h3 class="text-2xl sm:text-4xl font-black text-slate-800 tracking-tight">
-                        Selamat Datang, {{ explode(' ', auth()->user()->name)[0] }}! 👋
+                        Selamat Datang,
+                        @if(auth()->user()->role == 'admin')
+                            {{ explode(' ', auth()->user()->name)[0] }}
+                        @else
+                            {{ $penghuniKu->nama ?? auth()->user()->name }}
+                        @endif
+                        ! 👋
                     </h3>
 
                     @if(auth()->user()->role == 'admin')
@@ -208,7 +214,7 @@
                                     </h4>
 
                                     <p class="text-rose-100 text-sm mt-1">
-                                        Segera lunasi tagihanmu sampai seminggu kedepan jika tidak mau kehilangan poin!
+                                        Selesaikan pembayaran sebelum jatuh tempo untuk mendapatkan +50 poin! Terlambat bayar akan mengurangi -50 poin
                                         (Poin saat ini: <strong>{{ $penghuniKu->poin }}</strong>)
                                     </p>
 
@@ -222,9 +228,11 @@
                                 </div>
                             </div>
 
-                            <a href="{{ route('tagihan.show', $tagihanBulanIni->id) }}" class="w-full bg-white text-rose-600 font-black px-6 py-3.5 rounded-xl hover:bg-rose-50 transition-all shadow-md text-center text-base mt-2 block transform hover:-translate-y-0.5 duration-300">
+                            {{-- Tombol Bayar: pakai fetch() + Midtrans Snap popup, bukan form submit biasa --}}
+                            <button type="button" onclick="bayarTagihan({{ $tagihanBulanIni->id }})" id="btnBayar"
+                                class="w-full mt-2 bg-white text-rose-600 font-black px-6 py-3.5 rounded-xl hover:bg-rose-50 transition-all shadow-md text-center text-base block transform hover:-translate-y-0.5 duration-300">
                                 💳 Bayar Rp {{ number_format($tagihanBulanIni->jumlah_tagihan, 0, ',', '.') }}
-                            </a>
+                            </button>
                         </div>
 
                         <script>
@@ -263,6 +271,51 @@
                                     `;
                                 }, 1000);
                             });
+
+                            // Fungsi bayar via Midtrans Snap popup
+                            function bayarTagihan(id) {
+                                const btn = document.getElementById('btnBayar');
+                                const teksAsli = btn.innerHTML;
+                                btn.disabled = true;
+                                btn.innerHTML = '⏳ Memuat...';
+
+                                fetch(`/tagihan/${id}/bayar`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                    }
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                    btn.disabled = false;
+                                    btn.innerHTML = teksAsli;
+
+                                    if (data.snap_token) {
+                                        snap.pay(data.snap_token, {
+                                            onSuccess: function (result) {
+                                                window.location.reload();
+                                            },
+                                            onPending: function (result) {
+                                                window.location.reload();
+                                            },
+                                            onError: function (result) {
+                                                alert('Pembayaran gagal, silakan coba lagi.');
+                                            },
+                                            onClose: function () {
+                                                // User menutup popup tanpa menyelesaikan pembayaran
+                                            }
+                                        });
+                                    } else {
+                                        alert('Gagal memuat pembayaran. Silakan coba lagi.');
+                                    }
+                                })
+                                .catch(error => {
+                                    btn.disabled = false;
+                                    btn.innerHTML = teksAsli;
+                                    alert('Terjadi kesalahan koneksi. Silakan coba lagi.');
+                                });
+                            }
                         </script>
                     @endif
 
@@ -548,6 +601,9 @@
     </div>
 
     {{-- SCRIPT --}}
+    {{-- Midtrans Snap.js: WAJIB diload supaya fungsi snap.pay() di atas bisa jalan --}}
+    <script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="{{ config('services.midtrans.client_key') }}"></script>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script>
