@@ -303,7 +303,7 @@ class TagihanController extends Controller
             $font->file($fontBold); $font->size(14); $font->color($colorGray); $font->align('right'); 
         });
 
-        $img->text('Sewa Kos Putri Sunduwan', 90, 630, function($font) use ($fontBold, $colorDark) { 
+        $img->text('Sewa Kos', 90, 630, function($font) use ($fontBold, $colorDark) { 
             $font->file($fontBold); $font->size(18); $font->color($colorDark); 
         });
         $img->text($tagihan->bulan . ' ' . $tagihan->tahun, 400, 630, function($font) use ($fontReg, $colorDark) { 
