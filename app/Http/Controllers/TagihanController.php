@@ -369,16 +369,6 @@ class TagihanController extends Controller
         }
     }
 
-    public function verifikasi($id)
-    {
-        $tagihan = Tagihan::findOrFail($id);
-        if ($tagihan->status != 'lunas') {
-            $this->prosesPelunasanOtomatis($tagihan, 'manual');
-            return redirect()->route('tagihan.index')->with('success', 'Selamat! Pembayaran berhasil diverifikasi manual dan invoice telah diterbitkan.');
-        }
-        return redirect()->route('tagihan.index');
-    }
-
     public function lunasiManual($id)
     {
         $tagihan = Tagihan::with('penghuni.kamar')->findOrFail($id);
