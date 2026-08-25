@@ -365,9 +365,9 @@ class TagihanController extends Controller
         $pesanSukses = "*--- PEMBAYARAN KOS LUNAS ---*\n\n" .
                        "Halo *{$penghuni->nama}* 👋\n" .
                        "Terima kasih, pembayaran kos periode *{$tagihan->bulan} {$tagihan->tahun}* sebesar *Rp {$hargaFormat}* telah SUKSES diverifikasi.\n\n" .
-                       "🏆 *POIN:*\n" .
+                       "🏆 *STATUS:*\n" .
                        "{$teks_gamifikasi}.\n" .
-                       "TOTAL POIN ANDA SAAT INI: *{$penghuni->poin} Poin*.\n\n" .
+                       "Poin Anda saat ini: *{$penghuni->poin} Poin*.\n\n" .
                        "📄 *E-INVOICE RESMI:*\n" .
                        "Unduh e-invoice Anda di sini:\n" .
                        $linkInvoice . "\n\n" .
