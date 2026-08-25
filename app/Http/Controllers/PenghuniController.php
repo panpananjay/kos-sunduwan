@@ -40,12 +40,14 @@ class PenghuniController extends Controller
     {
         // 1. SATPAM FORMULIR: Cek ketat sebelum data masuk brankas!
         $request->validate([
-            'nama' => 'required|string|max:255',
-            'no_hp' => 'required|string|max:20',
+            'nama' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z\s]+$/'],
+            'no_hp' => ['required', 'string', 'regex:/^08[0-9]{8,11}$/'],
             'kamar_id' => 'required',
             'username' => 'required|string|unique:users,username', // 👈 Kunci Anti-Duplikat
             'password' => 'required|string|min:8',
         ], [
+            'nama.regex' => 'Nama lengkap hanya boleh berisi huruf dan spasi.',
+            'no_hp.regex' => 'Nomor HP/WhatsApp harus diawali 08 dan berupa nomor Indonesia yang valid.',
             'username.unique' => 'Maaf, username ini sudah dipakai! Silakan pilih nama lain.',
             'password.min' => 'Password minimal 8 karakter.',
         ]);
@@ -99,11 +101,13 @@ class PenghuniController extends Controller
 
         // 1. Tambahkan validasi username unik, kecuali untuk ID User milik penghuni ini sendiri
         $request->validate([
-            'nama' => 'required|string|max:255',
+            'nama' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z\s]+$/'],
             'username' => 'required|string|max:255|unique:users,username,' . $penghuni->user_id,
-            'no_hp' => 'required|string|max:20',
+            'no_hp' => ['required', 'string', 'regex:/^08[0-9]{8,11}$/'],
             'kamar_id' => 'required'
         ], [
+            'nama.regex' => 'Nama lengkap hanya boleh berisi huruf dan spasi.',
+            'no_hp.regex' => 'Nomor HP/WhatsApp harus diawali 08 dan berupa nomor Indonesia yang valid.',
             'username.unique' => 'Maaf, username ini sudah digunakan oleh akun lain!',
         ]);
 

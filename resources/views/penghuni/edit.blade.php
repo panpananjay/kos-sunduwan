@@ -62,7 +62,11 @@
                         
                         <div class="mb-4">
                             <label class="block text-gray-700 text-sm font-bold mb-2">Nama Lengkap</label>
-                            <input type="text" name="nama" value="{{ old('nama', $penghuni->nama) }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('nama') border-red-500 @enderror" required>
+                            <input type="text" name="nama" value="{{ old('nama', $penghuni->nama) }}"
+                                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('nama') border-red-500 @enderror"
+                                pattern="[A-Za-z\s]+"
+                                title="Nama hanya boleh berisi huruf dan spasi"
+                                required>
                             @error('nama')
                                 <p class="text-red-600 text-xs italic mt-1">{{ $message }}</p>
                             @enderror
@@ -78,7 +82,12 @@
 
                         <div class="mb-4">
                             <label class="block text-gray-700 text-sm font-bold mb-2">No. HP (WhatsApp)</label>
-                            <input type="text" name="no_hp" value="{{ old('no_hp', $penghuni->no_hp) }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('no_hp') border-red-500 @enderror" required>
+                            <input type="text" name="no_hp" value="{{ old('no_hp', $penghuni->no_hp) }}"
+                                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline @error('no_hp') border-red-500 @enderror"
+                                inputmode="numeric"
+                                pattern="08[0-9]{8,11}"
+                                title="Nomor harus diawali 08 dan berupa nomor HP Indonesia yang valid"
+                                required>
                             @error('no_hp')
                                 <p class="text-red-600 text-xs italic mt-1">{{ $message }}</p>
                             @enderror
