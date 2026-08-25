@@ -52,7 +52,8 @@ class DashboardController extends Controller
 
             $kamarKosong = Kamar::where('status', 'kosong')->count();
 
-            $queryTagihan = Tagihan::where('tahun', $tahunIni);
+           $queryTagihan = Tagihan::where('tahun', $tahunIni)
+                ->where('status', '!=', 'dibatalkan');
 
             // Jika filter bukan "Semua", filter berdasarkan bulan
             if ($bulanIni !== 'Semua') {
@@ -67,10 +68,7 @@ class DashboardController extends Controller
                 ->sum('jumlah_tagihan');
 
             $piutang = (clone $queryTagihan)
-                ->whereIn('status', [
-                    'belum_bayar',
-                    'menunggu_verifikasi'
-                ])
+                ->where('status', 'belum_bayar')
                 ->sum('jumlah_tagihan');
 
             // Total estimasi pendapatan dari kamar yang sedang terisi

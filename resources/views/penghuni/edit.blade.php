@@ -19,6 +19,40 @@
                 </div>
             @endif
 
+            {{-- 🆕 STATUS KEANGGOTAAN --}}
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6 border-t-4 {{ $penghuni->status === 'nonaktif' ? 'border-slate-400' : 'border-emerald-500' }}">
+                <div class="p-6 {{ $penghuni->status === 'nonaktif' ? 'bg-slate-50' : 'bg-emerald-50' }} flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h3 class="text-lg font-bold {{ $penghuni->status === 'nonaktif' ? 'text-slate-700' : 'text-emerald-800' }}">
+                            Status: {{ $penghuni->status === 'nonaktif' ? 'Nonaktif' : 'Aktif' }}
+                        </h3>
+                        @if($penghuni->status === 'nonaktif')
+                            <p class="text-sm text-slate-600">Penghuni ini sudah dinonaktifkan (kamar sebelumnya sudah dikosongkan). Aktifkan kembali kalau dia masuk ulang.</p>
+                        @else
+                            <p class="text-sm text-emerald-700">Penghuni ini masih berstatus aktif dan menempati kamar seperti biasa.</p>
+                        @endif
+                    </div>
+
+                    @if($penghuni->status === 'nonaktif')
+                        <form action="{{ route('penghuni.activate', $penghuni->id) }}" method="POST" onsubmit="return confirm('Aktifkan kembali {{ $penghuni->nama }}? Kamu perlu memilih kamar untuknya di form di bawah.');">
+                            @csrf
+                            @method('PUT')
+                            <button type="submit" class="bg-emerald-600 hover:bg-emerald-800 text-white font-bold py-2 px-4 rounded-md shadow transition duration-300 whitespace-nowrap">
+                                ✅ Aktifkan Kembali
+                            </button>
+                        </form>
+                    @else
+                        <form action="{{ route('penghuni.destroy', $penghuni->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menonaktifkan {{ $penghuni->nama }}?');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white font-bold py-2 px-4 rounded-md shadow transition duration-300 whitespace-nowrap">
+                                🗑️ Nonaktifkan
+                            </button>
+                        </form>
+                    @endif
+                </div>
+            </div>
+
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6 text-gray-900">
                     

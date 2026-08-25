@@ -19,9 +19,29 @@
                 </div>
             @endif
 
+            {{-- 🆕 TAB FILTER STATUS PENGHUNI --}}
+            <div class="mb-6 flex gap-2">
+                <a href="{{ route('penghuni.index', ['status' => 'aktif']) }}"
+                   class="px-4 py-2 rounded-xl text-xs font-bold border transition duration-200 {{ $status === 'aktif' ? 'bg-rose-600 text-white border-rose-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' }}">
+                    Aktif
+                </a>
+                <a href="{{ route('penghuni.index', ['status' => 'nonaktif']) }}"
+                   class="px-4 py-2 rounded-xl text-xs font-bold border transition duration-200 {{ $status === 'nonaktif' ? 'bg-rose-600 text-white border-rose-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' }}">
+                    Nonaktif / Riwayat
+                </a>
+                <a href="{{ route('penghuni.index', ['status' => 'semua']) }}"
+                   class="px-4 py-2 rounded-xl text-xs font-bold border transition duration-200 {{ $status === 'semua' ? 'bg-rose-600 text-white border-rose-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' }}">
+                    Semua
+                </a>
+            </div>
+
             <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div class="bg-white border border-slate-200 px-4 py-2 rounded-lg shadow-sm">
-                    <p class="text-sm font-bold text-slate-800">Total Penghuni Aktif: <span class="text-xl text-rose-600">{{ $penghunis->count() }}</span></p>
+                    <p class="text-sm font-bold text-slate-800">
+                        Total Penghuni
+                        {{ $status === 'aktif' ? 'Aktif' : ($status === 'nonaktif' ? 'Nonaktif' : '') }}:
+                        <span class="text-xl text-rose-600">{{ $penghunis->count() }}</span>
+                    </p>
                 </div>
                 
                 <a href="{{ route('penghuni.create') }}" class="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 sm:py-2.5 px-6 rounded-xl shadow-md transition duration-300 flex items-center justify-center gap-2 transform hover:-translate-y-0.5">
@@ -47,7 +67,7 @@
                             $bulanKe = ($totalBulan % 12) + 1;
                         @endphp
 
-                        <div class="bg-white p-5 rounded-2xl border border-slate-100 flex flex-col justify-between hover:border-rose-200 transition-all duration-300 shadow-sm hover:shadow-md">
+                        <div class="bg-white p-5 rounded-2xl border {{ $p->status === 'nonaktif' ? 'border-slate-200 opacity-60' : 'border-slate-100 hover:border-rose-200' }} flex flex-col justify-between transition-all duration-300 shadow-sm hover:shadow-md">
                             
                             <div class="flex justify-between items-start mb-4">
                                 <div class="flex items-center gap-3">
@@ -56,9 +76,16 @@
                                     </div>
                                     <div>
                                         <h4 class="font-bold text-slate-800 text-sm">{{ $p->nama }}</h4>
-                                        <span class="text-[10px] text-slate-500 font-bold bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">
-                                            {{ $p->kamar ? 'Kamar ' . $p->kamar->nomor_kamar : 'Belum Ada Kamar' }}
-                                        </span>
+                                        <div class="flex items-center gap-1 mt-0.5">
+                                            <span class="text-[10px] text-slate-500 font-bold bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">
+                                                {{ $p->kamar ? 'Kamar ' . $p->kamar->nomor_kamar : 'Belum Ada Kamar' }}
+                                            </span>
+                                            @if($p->status === 'nonaktif')
+                                                <span class="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                                                    Nonaktif
+                                                </span>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
                                 @if(isset($p->poin) && $p->poin > 0)
@@ -97,12 +124,14 @@
                                     </button>
                                 </form>
 
-                                <form action="{{ route('penghuni.destroy', $p->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus penghuni ini?');">
+                                @if($p->status !== 'nonaktif')
+                                <form action="{{ route('penghuni.destroy', $p->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menonaktifkan penghuni ini?');">
                                     @csrf @method('DELETE')
-                                    <button type="submit" class="flex-1 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white px-3 py-2 rounded-xl font-bold transition duration-300 text-xs border border-rose-200" title="Hapus">
+                                    <button type="submit" class="flex-1 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white px-3 py-2 rounded-xl font-bold transition duration-300 text-xs border border-rose-200" title="Nonaktifkan">
                                         🗑️
                                     </button>
                                 </form>
+                                @endif
                             </div>
                         </div>
                         @empty

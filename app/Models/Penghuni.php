@@ -15,6 +15,7 @@ class Penghuni extends Model
         'no_hp',
         'kamar_id',
         'poin',
+        'status'
     ];
 
     // Otomatis membatasi poin antara 0 sampai 600

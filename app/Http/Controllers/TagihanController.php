@@ -111,6 +111,15 @@ class TagihanController extends Controller
                     'status'         => 'belum_bayar',
                 ]);
             }
+            // 3b. Jika tagihan bulan ini sebelumnya pernah DIBATALKAN, terbitkan ulang
+            // dengan harga terbaru, alih-alih dibiarkan menggantung berstatus dibatalkan
+            elseif ($tagihan->status === 'dibatalkan') {
+                $tagihan->update([
+                    'jumlah_tagihan' => $penghuni->kamar->harga ?? 0,
+                    'status'         => 'belum_bayar',
+                    'catatan'        => null,
+                ]);
+            }
 
             // 4. Kirim notifikasi WhatsApp
             $nominal = number_format($tagihan->jumlah_tagihan, 0, ',', '.');
@@ -410,9 +419,17 @@ class TagihanController extends Controller
     public function destroy($id)
     {
         $tagihan = Tagihan::findOrFail($id);
-        Storage::disk('public')->delete('invoices/Invoice_' . $tagihan->id . '.png');
-        $tagihan->delete();
-        return redirect()->route('tagihan.index')->with('success', 'Data tagihan berhasil dihapus!');
+
+        // Cegah pembatalan tagihan yang statusnya sudah lunas —
+        // supaya riwayat pembayaran yang sah nggak bisa "hilang" lewat tombol ini
+        if ($tagihan->status === 'lunas') {
+            return redirect()->route('tagihan.index')
+                ->with('error', 'Tagihan yang sudah lunas tidak bisa dibatalkan.');
+        }
+
+        $tagihan->update(['status' => 'dibatalkan']);
+
+        return redirect()->route('tagihan.index')->with('success', 'Tagihan berhasil dibatalkan!');
     }
 
     public function unduhInvoice($id)

@@ -10,13 +10,21 @@ use Illuminate\Http\Request;
 
 class PenghuniController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // Ambil semua data penghuni, dan sekalian 'gandeng' data kamarnya (Eager Loading)
-        $penghunis = Penghuni::with('kamar')->get();
-        
+        // Filter status: default cuma tampilkan yang aktif
+        $status = $request->query('status', 'aktif');
+
+        $query = Penghuni::with('kamar');
+
+        if ($status !== 'semua') {
+            $query->where('status', $status);
+        }
+
         // Bawa datanya ke halaman daftar penghuni
-        return view('penghuni.index', compact('penghunis'));
+        $penghunis = $query->latest()->get();
+
+        return view('penghuni.index', compact('penghunis', 'status'));
     }
 
     public function create()
@@ -39,7 +47,7 @@ class PenghuniController extends Controller
             'password' => 'required|string|min:8',
         ], [
             'username.unique' => 'Maaf, username ini sudah dipakai! Silakan pilih nama lain.',
-            'password.min' => 'Password minimal harus 8 karakter ya.',
+            'password.min' => 'Password minimal 8 karakter.',
         ]);
 
         // 2. Buat Akun Login Dulu (Tabel Users)
@@ -72,10 +80,10 @@ class PenghuniController extends Controller
     {
         // Ikut sertakan data user agar variabel $penghuni->username bisa terbaca di blade edit
         $penghuni = \App\Models\Penghuni::with('user')->findOrFail($id);
-        
+
         // Inject properti username langsung ke objek penghuni dari relasi tabel user (biar clean di blade)
         $penghuni->username = $penghuni->user ? $penghuni->user->username : '';
-        
+
         // Ambil daftar kamar (Hanya kamar kosong + kamar yang sedang dipakai anak ini)
         $kamars = \App\Models\Kamar::where('status', 'kosong')
                                   ->orWhere('id', $penghuni->kamar_id)
@@ -138,8 +146,8 @@ class PenghuniController extends Controller
     public function destroy($id)
     {
         $penghuni = \App\Models\Penghuni::findOrFail($id);
-        
-        // 👇 KABEL PENGHUBUNG 3: KOSONGKAN KAMARNYA SEBELUM DIHAPUS 👇
+
+        // Kosongkan kamarnya (kamar jadi tersedia buat penghuni baru)
         if ($penghuni->kamar_id) {
             $kamar = \App\Models\Kamar::find($penghuni->kamar_id);
             if ($kamar) {
@@ -147,18 +155,45 @@ class PenghuniController extends Controller
             }
         }
 
-        // Catat ID Akun Login-nya sebelum biodatanya dibakar
-        $idAkun = $penghuni->user_id;
+        // Nonaktifkan penghuni — BUKAN dihapus, supaya riwayat tagihan tetap tersambung
+        $penghuni->update([
+            'status' => 'nonaktif',
+            'kamar_id' => null,
+        ]);
 
-        // Bakar biodata penghuni dari tabel penghunis
-        $penghuni->delete();
-
-        // HANCURKAN JUGA AKUN LOGIN-NYA!
-        if ($idAkun) {
-            \App\Models\User::destroy($idAkun);
+        // Nonaktifkan akun login-nya juga (ganti password acak + jangan hapus,
+        // supaya riwayat siapa yang membuat/memverifikasi tagihan tetap utuh)
+        if ($penghuni->user_id) {
+            $user = \App\Models\User::find($penghuni->user_id);
+            if ($user) {
+                $user->update([
+                    'password' => \Illuminate\Support\Facades\Hash::make(bin2hex(random_bytes(16))),
+                ]);
+            }
         }
 
-        return redirect()->route('penghuni.index')->with('success', 'Data penghuni dihapus dan kamarnya otomatis menjadi kosong!');
+        return redirect()->route('penghuni.index')->with('success', 'Penghuni berhasil dinonaktifkan dan kamarnya otomatis menjadi kosong!');
+    }
+
+    // 🆕 MESIN 4: Aktifkan kembali penghuni yang sudah dinonaktifkan
+    public function activate($id)
+    {
+        $penghuni = \App\Models\Penghuni::findOrFail($id);
+
+        $kamarKosong = \App\Models\Kamar::where('status', 'kosong')->first();
+
+        if (!$kamarKosong) {
+            return redirect()->back()->with('error', 'Tidak bisa mengaktifkan: tidak ada kamar kosong tersedia. Kosongkan kamar dulu atau edit manual.');
+        }
+
+        $penghuni->update([
+            'status' => 'aktif',
+            'kamar_id' => $kamarKosong->id,
+        ]);
+
+        $kamarKosong->update(['status' => 'terisi']);
+
+        return redirect()->route('penghuni.edit', $penghuni->id)->with('success', $penghuni->nama.' berhasil diaktifkan kembali di Kamar '.$kamarKosong->nomor_kamar.'. Silakan sesuaikan datanya kalau perlu.');
     }
 
     // MESIN 3: Untuk mereset password anak kos yang pelupa

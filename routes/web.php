@@ -98,6 +98,8 @@ Route::middleware([
     Route::resource('penghuni', PenghuniController::class)->except(['show']);
     Route::post('/penghuni/{id}/reset-password', [PenghuniController::class, 'resetPassword'])
         ->name('penghuni.reset_password');
+    Route::put('/penghuni/{id}/activate', [PenghuniController::class, 'activate'])
+        ->name('penghuni.activate');
 
     // Manajemen Tagihan Admin
     Route::post('/tagihan/generate', [TagihanController::class, 'generate'])

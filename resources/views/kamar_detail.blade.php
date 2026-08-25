@@ -106,7 +106,7 @@
                 <!-- DESKRIPSI -->
                 <h2 class="text-lg font-black mb-3 text-slate-900 uppercase tracking-wide">Deskripsi Kamar</h2>
                 <div class="text-slate-600 leading-relaxed text-sm text-justify mb-8 bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    {{ $kamar->deskripsi ?? 'Kamar ini berukuran 4x4 meter, didesain dengan tembok berlapis keramik sehingga ruangan terasa lebih bersih dan sejuk. Ruangan sudah dilengkapi juga dengan fasilitas dapur kecil (pantry) serta kamar mandi dalam. Sangat cocok untuk mahasiswi yang mengutamakan privasi dan kenyamanan.' }}
+                    {{ $kamar->deskripsi ?? 'Kamar ini berukuran 3,5 x 3,5 meter, didesain dengan tembok berlapis keramik sehingga ruangan terasa lebih bersih dan sejuk. Ruangan sudah dilengkapi juga dengan fasilitas dapur kecil (pantry) serta kamar mandi dalam. Sangat cocok untuk mahasiswi yang mengutamakan privasi dan kenyamanan.' }}
                 </div>
 
                 <!-- RENDERING FASILITAS DINAMIS -->

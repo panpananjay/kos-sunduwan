@@ -157,6 +157,13 @@
                             >
                                 ✅ Lunas
                             </option>
+
+                            <option
+                                value="dibatalkan"
+                                {{ request('status') == 'dibatalkan' ? 'selected' : '' }}
+                            >
+                                🚫 Dibatalkan
+                            </option>
                         </select>
 
                         <button
@@ -329,6 +336,12 @@
                                                     ✅ Lunas
                                                 </span>
 
+                                            @elseif($tagihan->status == 'dibatalkan')
+
+                                                <span class="bg-slate-100 text-slate-500 font-bold px-3 py-1.5 rounded-lg text-[10px] border border-slate-200">
+                                                    🚫 Dibatalkan
+                                                </span>
+
                                             @else
 
                                                 <span class="bg-rose-50 text-rose-600 font-bold px-3 py-1.5 rounded-lg text-[10px] border border-rose-100">
@@ -390,22 +403,26 @@
 
                                                 @endif
 
-                                                {{-- HAPUS TAGIHAN --}}
-                                                <form
-                                                    action="{{ route('tagihan.destroy', $tagihan->id) }}"
-                                                    method="POST"
-                                                    onsubmit="return confirm('Yakin ingin menghapus data ini?')"
-                                                >
-                                                    @csrf
-                                                    @method('DELETE')
+                                                {{-- BATALKAN TAGIHAN --}}
+                                                @if($tagihan->status == 'belum_bayar')
 
-                                                    <button
-                                                        type="submit"
-                                                        class="bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-600 font-bold px-3 py-2 rounded-xl text-[10px] transition-colors"
+                                                    <form
+                                                        action="{{ route('tagihan.destroy', $tagihan->id) }}"
+                                                        method="POST"
+                                                        onsubmit="return confirm('Yakin ingin membatalkan tagihan ini?')"
                                                     >
-                                                        🗑️
-                                                    </button>
-                                                </form>
+                                                        @csrf
+                                                        @method('DELETE')
+
+                                                        <button
+                                                            type="submit"
+                                                            class="bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-600 font-bold px-3 py-2 rounded-xl text-[10px] transition-colors"
+                                                        >
+                                                            🚫
+                                                        </button>
+                                                    </form>
+
+                                                @endif
 
                                             @endif
 
