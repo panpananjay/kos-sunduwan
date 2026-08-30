@@ -114,6 +114,21 @@ class TagihanController extends Controller
             // 3b. Jika tagihan bulan ini sebelumnya pernah DIBATALKAN, terbitkan ulang
             // dengan harga terbaru, alih-alih dibiarkan menggantung berstatus dibatalkan
             elseif ($tagihan->status === 'dibatalkan') {
+
+                // Safety net: pastikan tidak ada voucher tersisa yang masih
+                // menempel dari siklus pembatalan sebelumnya (mis. data yang
+                // sempat salah sebelum bugfix di destroy() ditambahkan).
+                foreach ($tagihan->vouchers as $voucher) {
+                    $statusBaru = ($voucher->masa_berlaku && \Carbon\Carbon::parse($voucher->masa_berlaku)->isPast())
+                        ? 'expired'
+                        : 'aktif';
+
+                    $voucher->update([
+                        'status'     => $statusBaru,
+                        'tagihan_id' => null,
+                    ]);
+                }
+
                 $tagihan->update([
                     'jumlah_tagihan' => $penghuni->kamar->harga ?? 0,
                     'status'         => 'belum_bayar',
@@ -418,7 +433,7 @@ class TagihanController extends Controller
 
     public function destroy($id)
     {
-        $tagihan = Tagihan::findOrFail($id);
+        $tagihan = Tagihan::with('vouchers')->findOrFail($id);
 
         // Cegah pembatalan tagihan yang statusnya sudah lunas —
         // supaya riwayat pembayaran yang sah nggak bisa "hilang" lewat tombol ini
@@ -427,9 +442,34 @@ class TagihanController extends Controller
                 ->with('error', 'Tagihan yang sudah lunas tidak bisa dibatalkan.');
         }
 
+        // BUGFIX: lepaskan voucher yang terpasang di tagihan ini sebelum
+        // dibatalkan. Tanpa ini, voucher lama (status 'terpakai',
+        // tagihan_id => tagihan ini) tetap menempel, dan ketika tagihan
+        // diterbitkan ulang lewat generate() dengan ID yang sama, voucher
+        // itu ikut terbawa dan salah menghitung "harga sebelum diskon" di
+        // kartu tagihan — padahal diskonnya belum pernah benar-benar
+        // dipakai karena pembayarannya sendiri batal.
+        foreach ($tagihan->vouchers as $voucher) {
+            if ($voucher->status === 'terpakai') {
+
+                // Kalau voucher belum lewat masa berlaku, kembalikan ke
+                // 'aktif' supaya penghuni bisa memakainya lagi. Kalau
+                // sudah lewat masa berlaku, cukup lepaskan tagihan_id-nya
+                // dan biarkan statusnya 'expired'.
+                $statusBaru = ($voucher->masa_berlaku && \Carbon\Carbon::parse($voucher->masa_berlaku)->isPast())
+                    ? 'expired'
+                    : 'aktif';
+
+                $voucher->update([
+                    'status'     => $statusBaru,
+                    'tagihan_id' => null,
+                ]);
+            }
+        }
+
         $tagihan->update(['status' => 'dibatalkan']);
 
-        return redirect()->route('tagihan.index')->with('success', 'Tagihan berhasil dibatalkan!');
+        return redirect()->route('tagihan.index')->with('success', 'Tagihan berhasil dibatalkan, voucher yang terpasang telah dikembalikan.');
     }
 
     public function unduhInvoice($id)

@@ -363,7 +363,7 @@
                                                     onclick="ambilTokenMidtrans(event, '{{ $tagihan->id }}')"
                                                     class="bg-rose-500 hover:bg-rose-600 text-white font-bold px-4 py-2 rounded-xl text-[10px] transition-colors"
                                                 >
-                                                    Bayar
+                                                    Bayar Sekarang
                                                 </button>
 
                                             @endif
@@ -397,7 +397,7 @@
                                                             type="submit"
                                                             class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-xl text-[10px] transition-colors"
                                                         >
-                                                            Cash
+                                                            Konfirmasi Cash
                                                         </button>
                                                     </form>
 
@@ -418,7 +418,7 @@
                                                             type="submit"
                                                             class="bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-600 font-bold px-3 py-2 rounded-xl text-[10px] transition-colors"
                                                         >
-                                                            🚫
+                                                            Batalkan
                                                         </button>
                                                     </form>
 
