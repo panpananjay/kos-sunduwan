@@ -290,7 +290,7 @@
                             @endphp
 
                             {{-- CARD TAGIHAN --}}
-                                <div class="bg-white p-5 rounded-2xl border {{ $sudahTerlambat ? 'border-rose-300' : ($adaDiskon ? 'border-fuchsia-200' : 'border-slate-100') }} flex flex-col justify-between hover:border-rose-200 transition-all duration-300 shadow-sm hover:shadow-md">
+                            <div class="bg-white p-5 rounded-2xl border {{ $sudahTerlambat ? 'border-rose-300' : ($adaDiskon ? 'border-fuchsia-200' : 'border-slate-100') }} flex flex-col justify-between hover:border-rose-200 transition-all duration-300 shadow-sm hover:shadow-md">
 
                                 <div>
 
@@ -348,31 +348,31 @@
                                     </div>
 
                                     {{-- STATUS + BUTTON --}}
-                                    <div class="flex justify-between items-center pt-4 border-t border-slate-50">
+                                    <div class="flex flex-col gap-3 pt-4 border-t border-slate-50">
 
                                         {{-- STATUS --}}
-                                        <div>
+                                        <div class="flex flex-wrap items-center gap-1.5">
 
                                             @if($tagihan->status == 'lunas')
 
-                                                <span class="bg-emerald-50 text-emerald-600 font-bold px-3 py-1.5 rounded-lg text-[10px] border border-emerald-100">
+                                                <span class="bg-emerald-50 text-emerald-600 font-bold px-3 py-1.5 rounded-lg text-[10px] border border-emerald-100 whitespace-nowrap">
                                                     ✅ Lunas
                                                 </span>
 
                                             @elseif($tagihan->status == 'dibatalkan')
 
-                                                <span class="bg-slate-100 text-slate-500 font-bold px-3 py-1.5 rounded-lg text-[10px] border border-slate-200">
+                                                <span class="bg-slate-100 text-slate-500 font-bold px-3 py-1.5 rounded-lg text-[10px] border border-slate-200 whitespace-nowrap">
                                                     🚫 Dibatalkan
                                                 </span>
 
                                             @else
 
-                                                <span class="bg-rose-50 text-rose-600 font-bold px-3 py-1.5 rounded-lg text-[10px] border border-rose-100">
+                                                <span class="bg-rose-50 text-rose-600 font-bold px-3 py-1.5 rounded-lg text-[10px] border border-rose-100 whitespace-nowrap">
                                                     ❌ Belum Bayar
                                                 </span>
 
                                                 @if($sudahTerlambat)
-                                                    <span class="ml-1 bg-rose-600 text-white font-bold px-2.5 py-1.5 rounded-lg text-[10px] border border-rose-700 animate-pulse-subtle inline-block mt-1">
+                                                    <span class="bg-rose-600 text-white font-bold px-2.5 py-1.5 rounded-lg text-[10px] border border-rose-700 animate-pulse-subtle whitespace-nowrap">
                                                         ⏰ Terlambat {{ $labelTerlambat }}
                                                     </span>
                                                 @endif
@@ -382,7 +382,7 @@
                                         </div>
 
                                         {{-- BUTTON --}}
-                                        <div class="flex gap-2">
+                                        <div class="flex flex-wrap gap-2">
 
                                             {{-- BAYAR PENGHUNI --}}
                                             @if(auth()->user()->role == 'penghuni' && $tagihan->status == 'belum_bayar')
@@ -390,7 +390,7 @@
                                                 <button
                                                     type="button"
                                                     onclick="ambilTokenMidtrans(event, '{{ $tagihan->id }}')"
-                                                    class="bg-rose-500 hover:bg-rose-600 text-white font-bold px-4 py-2 rounded-xl text-[10px] transition-colors"
+                                                    class="flex-1 sm:flex-none whitespace-nowrap bg-rose-500 hover:bg-rose-600 text-white font-bold px-4 py-2 rounded-xl text-[10px] transition-colors"
                                                 >
                                                     Bayar
                                                 </button>
@@ -402,7 +402,7 @@
 
                                                 <a
                                                     href="{{ route('tagihan.unduh', $tagihan->id) }}"
-                                                    class="bg-slate-800 hover:bg-slate-900 text-white font-bold px-3 py-2 rounded-xl text-[10px] transition-colors"
+                                                    class="flex-1 sm:flex-none text-center whitespace-nowrap bg-slate-800 hover:bg-slate-900 text-white font-bold px-3 py-2 rounded-xl text-[10px] transition-colors"
                                                 >
                                                     Invoice
                                                 </a>
@@ -419,12 +419,13 @@
                                                         action="{{ route('tagihan.lunasi_manual', $tagihan->id) }}"
                                                         method="POST"
                                                         onsubmit="return confirm('Konfirmasi pembayaran Cash?')"
+                                                        class="flex-1 sm:flex-none"
                                                     >
                                                         @csrf
 
                                                         <button
                                                             type="submit"
-                                                            class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-xl text-[10px] transition-colors"
+                                                            class="w-full whitespace-nowrap bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-xl text-[10px] transition-colors"
                                                         >
                                                             Konfirmasi Cash
                                                         </button>
@@ -439,13 +440,14 @@
                                                         action="{{ route('tagihan.destroy', $tagihan->id) }}"
                                                         method="POST"
                                                         onsubmit="return confirm('Yakin ingin membatalkan tagihan ini?')"
+                                                        class="flex-1 sm:flex-none"
                                                     >
                                                         @csrf
                                                         @method('DELETE')
 
                                                         <button
                                                             type="submit"
-                                                            class="bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-600 font-bold px-3 py-2 rounded-xl text-[10px] transition-colors"
+                                                            class="w-full whitespace-nowrap bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-600 font-bold px-3 py-2 rounded-xl text-[10px] transition-colors"
                                                         >
                                                             Batalkan
                                                         </button>

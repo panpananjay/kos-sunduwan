@@ -154,14 +154,6 @@ class TagihanController extends Controller
         return redirect()->route('tagihan.index')->with('success', "Berhasil memproses dan mengirimkan {$jumlahTerkirim} notifikasi tagihan.");
     }
 
-    public function show($id)
-    {
-        $tagihan = Tagihan::with('penghuni.kamar')->findOrFail($id);
-        $user = auth()->user();
-        if ($user->role == 'penghuni' && $tagihan->penghuni->user_id != $user->id) abort(403);
-        return view('tagihan.show', compact('tagihan'));
-    }
-
     /**
      * Mengambil Snap Token dari Midtrans untuk Pembayaran Otomatis
      */
