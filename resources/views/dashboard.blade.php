@@ -70,7 +70,7 @@
                 @endif
             </div>
 
-            {{-- NOTIFIKASI --}}
+            {{-- NOTIFIKASI SESSION --}}
             @if(session('success'))
                 <div class="mb-6 p-4 bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-2xl font-bold text-sm flex items-center gap-2 shadow-sm animate-pulse-subtle">
                     <span>🎉</span>
@@ -202,121 +202,148 @@
 
                 @if($penghuniKu)
 
-                    {{-- TAGIHAN BELUM LUNAS --}}
+                    {{--
+                        =========================================================
+                        NOTIFIKASI TAGIHAN — PRIORITAS
+                        =========================================================
+                        Urutan prioritas (hanya SATU banner yang tampil):
+
+                        1. Tagihan BULAN INI, belum lunas, SUDAH lewat deadline
+                           -> banner "Sudah Terlambat X"
+                        2. Tagihan BULAN INI, belum lunas, MASIH dalam masa
+                           tenggang -> banner countdown seperti semula
+                        3. Tidak ada tagihan bulan ini yang perlu ditampilkan,
+                           TAPI ada tagihan LAMA yang menunggak & sudah lewat
+                           deadline -> banner "Tunggakan Lama"
+                        4. Tidak ada satupun -> tidak ada banner
+
+                        $labelTerlambatBulanIni, $tagihanTerlambat, dan
+                        $labelTerlambatLama semuanya dikirim dari
+                        DashboardController@index.
+                    --}}
+
                     @if($tagihanBulanIni && $tagihanBulanIni->status != 'lunas')
-                        <div class="mb-8 bg-gradient-to-r from-rose-500 to-orange-500 p-6 rounded-[2rem] shadow-lg shadow-rose-100 text-white flex flex-col items-start gap-6 animate-pulse-subtle">
-                            <div class="flex items-start gap-4 w-full">
-                                <span class="text-4xl mt-1">📢</span>
 
-                                <div class="flex-1">
-                                    <h4 class="font-black text-lg">
-                                        Tagihan {{ $tagihanBulanIni->bulan }} Belum Lunas
-                                    </h4>
+                        @if($labelTerlambatBulanIni)
+                            {{-- PRIORITAS 1: tagihan bulan ini sudah lewat deadline --}}
+                            <div class="mb-8 bg-gradient-to-r from-rose-700 to-rose-900 p-6 rounded-[2rem] shadow-lg shadow-rose-200 text-white flex flex-col items-start gap-6">
+                                <div class="flex items-start gap-4 w-full">
+                                    <span class="text-4xl mt-1">⏰</span>
 
-                                    <p class="text-rose-100 text-sm mt-1">
-                                        Selesaikan pembayaran sebelum jatuh tempo untuk mendapatkan +50 poin! Terlambat bayar akan mengurangi -50 poin
-                                        (Poin saat ini: <strong>{{ $penghuniKu->poin }}</strong>)
-                                    </p>
+                                    <div class="flex-1">
+                                        <h4 class="font-black text-lg">
+                                            Tagihan {{ $tagihanBulanIni->bulan }} Sudah Terlambat {{ $labelTerlambatBulanIni }}
+                                        </h4>
 
-                                    <div class="flex items-center mt-3">
-                                        <div id="countdown-timer" class="flex items-center gap-2 font-mono text-xl md:text-2xl font-bold tracking-widest text-white/90 drop-shadow-sm">
-                                            <span class="text-[10px] font-light animate-pulse tracking-normal">
-                                                LOAD...
-                                            </span>
+                                        <p class="text-rose-100 text-sm mt-1">
+                                            Segera lunasi tagihan ini. Keterlambatan membuat Anda terkena -50 poin kedisiplinan
+                                            (Poin saat ini: <strong>{{ $penghuniKu->poin }}</strong>)
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <button type="button" onclick="bayarTagihan({{ $tagihanBulanIni->id }})" id="btnBayar"
+                                    class="w-full mt-2 bg-white text-rose-700 font-black px-6 py-3.5 rounded-xl hover:bg-rose-50 transition-all shadow-md text-center text-base block transform hover:-translate-y-0.5 duration-300">
+                                    💳 Bayar Rp {{ number_format($tagihanBulanIni->jumlah_tagihan, 0, ',', '.') }}
+                                </button>
+                            </div>
+                        @else
+                            {{-- PRIORITAS 2: tagihan bulan ini, masih dalam masa tenggang (countdown) --}}
+                            <div class="mb-8 bg-gradient-to-r from-rose-500 to-orange-500 p-6 rounded-[2rem] shadow-lg shadow-rose-100 text-white flex flex-col items-start gap-6 animate-pulse-subtle">
+                                <div class="flex items-start gap-4 w-full">
+                                    <span class="text-4xl mt-1">📢</span>
+
+                                    <div class="flex-1">
+                                        <h4 class="font-black text-lg">
+                                            Tagihan {{ $tagihanBulanIni->bulan }} Belum Lunas
+                                        </h4>
+
+                                        <p class="text-rose-100 text-sm mt-1">
+                                            Selesaikan pembayaran sebelum jatuh tempo untuk mendapatkan +50 poin! Terlambat bayar akan mengurangi -50 poin
+                                            (Poin saat ini: <strong>{{ $penghuniKu->poin }}</strong>)
+                                        </p>
+
+                                        <div class="flex items-center mt-3">
+                                            <div id="countdown-timer" class="flex items-center gap-2 font-mono text-xl md:text-2xl font-bold tracking-widest text-white/90 drop-shadow-sm">
+                                                <span class="text-[10px] font-light animate-pulse tracking-normal">
+                                                    LOAD...
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+
+                                <button type="button" onclick="bayarTagihan({{ $tagihanBulanIni->id }})" id="btnBayar"
+                                    class="w-full mt-2 bg-white text-rose-600 font-black px-6 py-3.5 rounded-xl hover:bg-rose-50 transition-all shadow-md text-center text-base block transform hover:-translate-y-0.5 duration-300">
+                                    💳 Bayar Rp {{ number_format($tagihanBulanIni->jumlah_tagihan, 0, ',', '.') }}
+                                </button>
                             </div>
 
-                            {{-- Tombol Bayar: pakai fetch() + Midtrans Snap popup, bukan form submit biasa --}}
-                            <button type="button" onclick="bayarTagihan({{ $tagihanBulanIni->id }})" id="btnBayar"
-                                class="w-full mt-2 bg-white text-rose-600 font-black px-6 py-3.5 rounded-xl hover:bg-rose-50 transition-all shadow-md text-center text-base block transform hover:-translate-y-0.5 duration-300">
-                                💳 Bayar Rp {{ number_format($tagihanBulanIni->jumlah_tagihan, 0, ',', '.') }}
+                            <script>
+                                document.addEventListener('DOMContentLoaded', function () {
+                                    const timerDisplay = document.getElementById('countdown-timer');
+
+                                    if (!timerDisplay) return;
+
+                                    const createdDate = new Date("{{ $tagihanBulanIni->created_at->toIso8601String() }}").getTime();
+                                    const deadline = createdDate + (7 * 24 * 60 * 60 * 1000);
+
+                                    const x = setInterval(function () {
+                                        const now = new Date().getTime();
+                                        const distance = deadline - now;
+
+                                        if (distance < 0) {
+                                            clearInterval(x);
+                                            timerDisplay.innerHTML = "<span class='text-sm uppercase tracking-widest'>Waktu Habis 🚨</span>";
+                                            // Refresh agar server-side langsung menampilkan
+                                            // banner "Sudah Terlambat" begitu deadline lewat.
+                                            setTimeout(() => window.location.reload(), 2000);
+                                            return;
+                                        }
+
+                                        const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                                        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                                        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                                        const f = (num) => num.toString().padStart(2, '0');
+
+                                        timerDisplay.innerHTML = `
+                                            <span>${f(days)}</span>
+                                            <span class="text-xl opacity-40 font-light">:</span>
+                                            <span>${f(hours)}</span>
+                                            <span class="text-xl opacity-40 font-light">:</span>
+                                            <span>${f(minutes)}</span>
+                                            <span class="text-xl opacity-40 font-light animate-none">:</span>
+                                            <span class="text-rose-200">${f(seconds)}</span>
+                                        `;
+                                    }, 1000);
+                                });
+                            </script>
+                        @endif
+
+                   @elseif($tagihanTerlambat)
+                        {{-- PRIORITAS 3: tidak ada tagihan bulan ini aktif, tapi ada tunggakan lama --}}
+                        <div class="mb-8 bg-gradient-to-r from-rose-700 to-rose-900 p-6 rounded-[2rem] shadow-lg shadow-rose-200 text-white flex flex-col items-start gap-6">
+                            <div class="flex items-start gap-4 w-full">
+                                <span class="text-4xl mt-1">⏰</span>
+
+                                <div class="flex-1">
+                                    <h4 class="font-black text-lg">
+                                        Tagihan {{ $tagihanTerlambat->bulan }} Sudah Terlambat {{ $labelTerlambatLama }}
+                                    </h4>
+
+                                    <p class="text-rose-100 text-sm mt-1">
+                                        Segera lunasi tagihan ini. Keterlambatan membuat Anda terkena -50 poin kedisiplinan
+                                        (Poin saat ini: <strong>{{ $penghuniKu->poin }}</strong>)
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button type="button" onclick="bayarTagihan({{ $tagihanTerlambat->id }})" id="btnBayar"
+                                class="w-full mt-2 bg-white text-rose-700 font-black px-6 py-3.5 rounded-xl hover:bg-rose-50 transition-all shadow-md text-center text-base block transform hover:-translate-y-0.5 duration-300">
+                                💳 Bayar Rp {{ number_format($tagihanTerlambat->jumlah_tagihan, 0, ',', '.') }}
                             </button>
                         </div>
-
-                        <script>
-                            document.addEventListener('DOMContentLoaded', function () {
-                                const timerDisplay = document.getElementById('countdown-timer');
-
-                                if (!timerDisplay) return;
-
-                                const createdDate = new Date("{{ $tagihanBulanIni->created_at->toIso8601String() }}").getTime();
-                                const deadline = createdDate + (7 * 24 * 60 * 60 * 1000);
-
-                                const x = setInterval(function () {
-                                    const now = new Date().getTime();
-                                    const distance = deadline - now;
-
-                                    if (distance < 0) {
-                                        clearInterval(x);
-                                        timerDisplay.innerHTML = "<span class='text-sm uppercase tracking-widest'>Waktu Habis 🚨</span>";
-                                        return;
-                                    }
-
-                                    const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-                                    const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                    const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-                                    const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-                                    const f = (num) => num.toString().padStart(2, '0');
-
-                                    timerDisplay.innerHTML = `
-                                        <span>${f(days)}</span>
-                                        <span class="text-xl opacity-40 font-light">:</span>
-                                        <span>${f(hours)}</span>
-                                        <span class="text-xl opacity-40 font-light">:</span>
-                                        <span>${f(minutes)}</span>
-                                        <span class="text-xl opacity-40 font-light animate-none">:</span>
-                                        <span class="text-rose-200">${f(seconds)}</span>
-                                    `;
-                                }, 1000);
-                            });
-
-                            // Fungsi bayar via Midtrans Snap popup
-                            function bayarTagihan(id) {
-                                const btn = document.getElementById('btnBayar');
-                                const teksAsli = btn.innerHTML;
-                                btn.disabled = true;
-                                btn.innerHTML = '⏳ Memuat...';
-
-                                fetch(`/tagihan/${id}/bayar`, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                                    }
-                                })
-                                .then(response => response.json())
-                                .then(data => {
-                                    btn.disabled = false;
-                                    btn.innerHTML = teksAsli;
-
-                                    if (data.snap_token) {
-                                        snap.pay(data.snap_token, {
-                                            onSuccess: function (result) {
-                                                window.location.reload();
-                                            },
-                                            onPending: function (result) {
-                                                window.location.reload();
-                                            },
-                                            onError: function (result) {
-                                                alert('Pembayaran gagal, silakan coba lagi.');
-                                            },
-                                            onClose: function () {
-                                                // User menutup popup tanpa menyelesaikan pembayaran
-                                            }
-                                        });
-                                    } else {
-                                        alert('Gagal memuat pembayaran. Silakan coba lagi.');
-                                    }
-                                })
-                                .catch(error => {
-                                    btn.disabled = false;
-                                    btn.innerHTML = teksAsli;
-                                    alert('Terjadi kesalahan koneksi. Silakan coba lagi.');
-                                });
-                            }
-                        </script>
                     @endif
 
                     {{-- PROFIL PENGHUNI --}}
@@ -334,6 +361,12 @@
                                 <span class="bg-emerald-100 text-emerald-600 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full w-max mx-auto md:mx-0">
                                     Penghuni Aktif
                                 </span>
+
+                                @if($totalTunggakan > 0)
+                                    <span class="bg-rose-100 text-rose-600 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full w-max mx-auto md:mx-0">
+                                        {{ $totalTunggakan }} Tagihan Terlambat
+                                    </span>
+                                @endif
                             </div>
 
                             <div class="flex flex-wrap justify-center md:justify-start gap-4 sm:gap-6 text-sm font-medium text-slate-500 mt-3">
@@ -444,7 +477,16 @@
                         </div>
                     </div>
 
-                    {{-- INVENTORY VOUCHER --}}
+                    {{--
+                        =========================================================
+                        INVENTORY VOUCHER
+                        =========================================================
+                        $vouchers dikirim langsung dari DashboardController
+                        (query + bulk-update status expired sudah dilakukan di
+                        controller). TIDAK ADA query voucher lagi di blade ini —
+                        supaya optimisasi bulk-update di controller benar-benar
+                        terpakai, bukan tertimpa query duplikat.
+                    --}}
                     <div class="mt-6 mb-8 p-6 bg-white rounded-[2rem] shadow-sm border border-slate-100">
                         <div class="flex items-center gap-2 mb-4">
                             <span class="text-xl">🎒</span>
@@ -454,20 +496,8 @@
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            @php
-                                $vouchers = \App\Models\Voucher::where('penghuni_id', $penghuniKu->id)
-                                    ->where('status', '!=', 'terpakai')
-                                    ->orderByRaw("FIELD(status, 'aktif', 'expired')")
-                                    ->latest()
-                                    ->get();
-                            @endphp
 
                             @forelse($vouchers as $v)
-                                @php
-                                    if ($v->status == 'aktif' && \Carbon\Carbon::now()->gt($v->masa_berlaku)) {
-                                        $v->update(['status' => 'expired']);
-                                    }
-                                @endphp
 
                                 <div class="p-5 rounded-2xl border flex justify-between items-center transition-all duration-300 relative overflow-hidden {{ $v->status == 'aktif' ? 'border-emerald-200 bg-emerald-50/40 shadow-sm shadow-emerald-50' : 'border-slate-200 bg-slate-100/70 opacity-60 select-none' }}">
                                     <div>
@@ -506,6 +536,7 @@
                                         @endif
                                     </div>
                                 </div>
+
                             @empty
                                 <div class="col-span-1 md:col-span-2 text-center py-8 border border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm font-medium italic">
                                     🎒 Inventory kosong. Yuk, kumpulkan poin disiplin untuk klaim voucher sewa!
@@ -641,6 +672,55 @@
 
             modal.classList.add('hidden');
             modal.classList.remove('flex');
+        }
+
+        // Fungsi bayar via Midtrans Snap popup — dipakai oleh SEMUA
+        // varian banner notifikasi tagihan di atas (aktif / countdown /
+        // terlambat), karena hanya satu banner yang pernah dirender
+        // dalam satu waktu (struktur kondisional if/elseif di Blade),
+        // sehingga tidak akan ada duplikat id="btnBayar" di DOM.
+        function bayarTagihan(id) {
+            const btn = document.getElementById('btnBayar');
+            const teksAsli = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Memuat...';
+
+            fetch(`/tagihan/${id}/bayar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = teksAsli;
+
+                if (data.snap_token) {
+                    snap.pay(data.snap_token, {
+                        onSuccess: function (result) {
+                            window.location.reload();
+                        },
+                        onPending: function (result) {
+                            window.location.reload();
+                        },
+                        onError: function (result) {
+                            alert('Pembayaran gagal, silakan coba lagi.');
+                        },
+                        onClose: function () {
+                            // User menutup popup tanpa menyelesaikan pembayaran
+                        }
+                    });
+                } else {
+                    alert('Gagal memuat pembayaran. Silakan coba lagi.');
+                }
+            })
+            .catch(error => {
+                btn.disabled = false;
+                btn.innerHTML = teksAsli;
+                alert('Terjadi kesalahan koneksi. Silakan coba lagi.');
+            });
         }
 
         @if(auth()->user()->role == 'admin')

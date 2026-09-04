@@ -7,6 +7,7 @@ use App\Models\Kamar;
 use App\Models\Tagihan;
 use App\Models\Penghuni;
 use App\Models\Pengaduan;
+use App\Models\Voucher;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -77,7 +78,7 @@ class DashboardController extends Controller
 
             $kamarKosong = Kamar::where('status', 'kosong')->count();
 
-           $queryTagihan = Tagihan::where('tahun', $tahunIni)
+            $queryTagihan = Tagihan::where('tahun', $tahunIni)
                 ->where('status', '!=', 'dibatalkan');
 
             // Jika filter bukan "Semua", filter berdasarkan bulan
@@ -137,19 +138,8 @@ class DashboardController extends Controller
             |--------------------------------------------------------------------------
             | Ambil data penghuni berdasarkan user_id
             |--------------------------------------------------------------------------
-            |
             | Nama penghuni yang digunakan di dashboard berasal dari:
-            |
-            | $penghuniKu->nama
-            |
-            | yaitu:
-            |
-            | penghunis.nama
-            |
-            | BUKAN:
-            |
-            | users.name
-            |
+            | $penghuniKu->nama (penghunis.nama) BUKAN users.name
             */
 
             $penghuniKu = Penghuni::with('kamar')
@@ -166,7 +156,34 @@ class DashboardController extends Controller
 
             $tanggalMasuk = null;
 
+            // Info keterlambatan (diisi di bawah jika penghuni ada)
+            $labelTerlambatBulanIni = null;
+            $tagihanTerlambat       = null;
+            $labelTerlambatLama     = null;
+
+            // Info akumulasi tunggakan (hanya yang SUDAH lewat deadline —
+            // diisi setelah blok pengecekan keterlambatan di bawah)
+            $totalTunggakan    = 0;
+            $tagihanBelumLunas = collect();
+
+            // Data voucher penghuni
+            $vouchers = collect();
+
             if ($penghuniKu) {
+
+                // ==========================================
+                // AMBIL SEMUA TAGIHAN BELUM_BAYAR
+                // ==========================================
+                //
+                // Catatan: koleksi ini masih berisi SEMUA tagihan
+                // berstatus belum_bayar, termasuk yang masih dalam
+                // masa tenggang 7 hari (belum telat). Jangan langsung
+                // di-count() di sini — filter deadline dilakukan
+                // di bawah, setelah blok pengecekan keterlambatan.
+                $tagihanBelumLunas = Tagihan::where('penghuni_id', $penghuniKu->id)
+                    ->where('status', 'belum_bayar')
+                    ->orderBy('created_at', 'asc')
+                    ->get();
 
                 // ==========================================
                 // CARI TAGIHAN BULAN INI
@@ -179,6 +196,80 @@ class DashboardController extends Controller
                     ->where('bulan', $bulanIni)
                     ->where('tahun', $tahunIni)
                     ->first();
+
+                // ==========================================
+                // CEK KETERLAMBATAN TAGIHAN
+                // ==========================================
+                //
+                // Prioritas notifikasi:
+                // 1. Tagihan BULAN INI (baik masih dalam masa tenggang
+                //    maupun sudah lewat deadline) SELALU diprioritaskan
+                //    untuk ditampilkan sebagai banner utama di dashboard.
+                // 2. Tagihan LAMA yang masih menunggak & sudah lewat
+                //    deadline hanya ditampilkan sebagai notifikasi
+                //    kalau TIDAK ADA tagihan bulan ini yang perlu
+                //    ditampilkan.
+
+                // 1. Apakah tagihan BULAN INI sendiri sudah lewat deadline?
+                if ($tagihanBulanIni && $tagihanBulanIni->status != 'lunas') {
+                    $deadlineBulanIni = Carbon::parse($tagihanBulanIni->created_at)
+                        ->addDays(7)->endOfDay();
+
+                    if (Carbon::now()->gt($deadlineBulanIni)) {
+                        $labelTerlambatBulanIni = $this->formatKeterlambatan($deadlineBulanIni);
+                    }
+                }
+
+                // 2. Cari tagihan LAMA (selain bulan ini) yang masih
+                //    belum_bayar dan sudah lewat deadline — ambil yang
+                //    paling lama menunggak (created_at paling awal).
+                $kandidatTerlambat = $tagihanBelumLunas->reject(function ($t) use ($tagihanBulanIni) {
+                    return $tagihanBulanIni && $t->id === $tagihanBulanIni->id;
+                });
+
+                foreach ($kandidatTerlambat as $t) {
+                    $deadlineT = Carbon::parse($t->created_at)->addDays(7)->endOfDay();
+
+                    if (Carbon::now()->gt($deadlineT)) {
+                        if (!$tagihanTerlambat || $t->created_at->lt($tagihanTerlambat->created_at)) {
+                            $tagihanTerlambat   = $t;
+                            $labelTerlambatLama = $this->formatKeterlambatan($deadlineT);
+                        }
+                    }
+                }
+
+                // ==========================================
+                // HITUNG TOTAL TUNGGAKAN (hanya yang sudah lewat deadline)
+                // ==========================================
+                //
+                // Tagihan berstatus belum_bayar yang MASIH dalam masa
+                // tenggang 7 hari TIDAK dihitung sebagai tunggakan —
+                // itu wajar/belum telat. Yang dihitung hanya tagihan
+                // yang deadline-nya (created_at + 7 hari) sudah lewat,
+                // baik itu tagihan bulan ini maupun tagihan lama.
+                $totalTunggakan = $tagihanBelumLunas->filter(function ($t) {
+                    $deadlineT = Carbon::parse($t->created_at)->addDays(7)->endOfDay();
+                    return Carbon::now()->gt($deadlineT);
+                })->count();
+
+                // ==========================================
+                // LOGIKA INVENTORY VOUCHER PENGHUNI
+                // ==========================================
+
+                // Bulk update voucher yang sudah lewat masa berlaku
+                // sekaligus lewat query, sebelum datanya diambil —
+                // menghindari N query update satu-satu di blade.
+                Voucher::where('penghuni_id', $penghuniKu->id)
+                    ->where('status', 'aktif')
+                    ->whereNotNull('masa_berlaku')
+                    ->where('masa_berlaku', '<', Carbon::now())
+                    ->update(['status' => 'expired']);
+
+                $vouchers = Voucher::where('penghuni_id', $penghuniKu->id)
+                    ->where('status', '!=', 'terpakai')
+                    ->orderByRaw("FIELD(status, 'aktif', 'expired')")
+                    ->latest()
+                    ->get();
 
                 // ==========================================
                 // CARI PENGADUAN TERAKHIR
@@ -205,7 +296,9 @@ class DashboardController extends Controller
 
                 // ==========================================
                 // CARI TANGGAL MASUK
-                // Dari tagihan LUNAS pertama
+                // Dari tagihan LUNAS pertama, diurutkan langsung
+                // lewat SQL (created_at) supaya tidak menarik
+                // seluruh data ke memori PHP hanya untuk sorting.
                 // ==========================================
 
                 $tagihanPertamaLunas = Tagihan::where(
@@ -213,17 +306,7 @@ class DashboardController extends Controller
                     $penghuniKu->id
                 )
                     ->where('status', 'lunas')
-                    ->get()
-                    ->sortBy(function ($tagihan) {
-
-                        return $tagihan->tahun .
-                            str_pad(
-                                $this->daftarBulanUrut[$tagihan->bulan] ?? 0,
-                                2,
-                                '0',
-                                STR_PAD_LEFT
-                            );
-                    })
+                    ->orderBy('created_at', 'asc')
                     ->first();
 
                 $tanggalMasuk = $tagihanPertamaLunas
@@ -271,9 +354,46 @@ class DashboardController extends Controller
                 'level',
                 'bulanIni',
                 'tahunIni',
-                'tanggalMasuk'
+                'tanggalMasuk',
+                'labelTerlambatBulanIni',
+                'tagihanTerlambat',
+                'labelTerlambatLama',
+                'totalTunggakan',
+                'tagihanBelumLunas',
+                'vouchers'
             ));
         }
+    }
+
+    /**
+     * Mengubah selisih waktu sejak deadline terlampaui menjadi label
+     * yang mudah dibaca: hari, minggu, atau bulan.
+     *
+     * Ambang batas:
+     * - < 7 hari   -> ditampilkan dalam satuan hari
+     * - < 30 hari  -> ditampilkan dalam satuan minggu (dibulatkan ke bawah)
+     * - >= 30 hari -> ditampilkan dalam satuan bulan (dibulatkan ke bawah)
+     *
+     * Dipakai baik untuk notifikasi dashboard penghuni maupun badge
+     * "Terlambat" pada menu Tagihan, supaya perhitungannya konsisten
+     * di seluruh sistem.
+     *
+     * @param  Carbon  $deadline  Batas waktu (created_at + 7 hari, endOfDay)
+     * @return string
+     */
+    private function formatKeterlambatan(Carbon $deadline): string
+    {
+        $hari = (int) floor($deadline->diffInDays(Carbon::now()));
+
+        if ($hari < 7) {
+            return $hari . ' hari';
+        }
+
+        if ($hari < 30) {
+            return intdiv($hari, 7) . ' minggu';
+        }
+
+        return intdiv($hari, 30) . ' bulan';
     }
 
     /**
@@ -289,12 +409,15 @@ class DashboardController extends Controller
      *    terakhir pada deret tersebut.
      * 3. Untuk forecast bulan ke-(t+2) dan (t+3), hasil forecast
      *    sebelumnya ikut dimasukkan ke deret sebagai "data" sebelum
-     *    rata-rata dihitung ulang — ini adalah pendekatan standar
-     *    SMA untuk proyeksi multi-periode ke depan.
-     * 4. Jika riwayat data historis belum ada sama sekali (sistem
-     *    baru dipakai / belum ada tagihan lunas), forecast jatuh
-     *    kembali (fallback) ke estimasi berbasis kamar terisi saat
-     *    ini, supaya dashboard tidak menampilkan angka nol.
+     *    rata-rata dihitung ulang — pendekatan standar SMA untuk
+     *    proyeksi multi-periode ke depan.
+     * 4. Jika riwayat data historis belum ada sama sekali, forecast
+     *    jatuh kembali (fallback) ke estimasi berbasis kamar terisi
+     *    saat ini, supaya dashboard tidak menampilkan angka nol.
+     * 5. Titik awal penambahan bulan (addMonths) mengikuti bulan/tahun
+     *    yang SEDANG DIFILTER di dashboard ($bulanIni/$tahunIni), bukan
+     *    selalu tanggal hari ini — supaya forecasting tetap akurat saat
+     *    admin melihat data periode lampau.
      *
      * @param  string  $bulanIni
      * @param  int|string  $tahunIni
@@ -339,7 +462,12 @@ class DashboardController extends Controller
 
         for ($i = 1; $i <= 3; $i++) {
 
-            $date = Carbon::now()->addMonths($i);
+            // Titik awal penambahan bulan mengikuti bulan/tahun yang
+            // SEDANG DIFILTER ($tahunIni, $nomorBulanSekarang), bukan
+            // Carbon::now() — supaya forecasting tetap benar walau
+            // admin sedang melihat data periode lampau.
+            $date = Carbon::createFromDate((int) $tahunIni, $nomorBulanSekarang, 1)
+                ->addMonths($i);
 
             // Ambil PERIODE_SMA data terakhir dari deret
             // (data aktual, atau campuran aktual + hasil forecast

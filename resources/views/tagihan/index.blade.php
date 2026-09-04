@@ -266,8 +266,31 @@
                                 $hargaAwal       = $tagihan->jumlah_tagihan + $totalDiskon;
                             @endphp
 
+                            @php
+                                // Hitung status keterlambatan (hanya relevan untuk status belum_bayar)
+                                $sudahTerlambat = false;
+                                $labelTerlambat = null;
+
+                                if ($tagihan->status === 'belum_bayar') {
+                                    $deadlineTagihan = \Carbon\Carbon::parse($tagihan->created_at)->addDays(7)->endOfDay();
+
+                                    if (\Carbon\Carbon::now()->gt($deadlineTagihan)) {
+                                        $sudahTerlambat = true;
+                                        $hariTerlambat  = (int) floor($deadlineTagihan->diffInDays(\Carbon\Carbon::now()));
+
+                                        if ($hariTerlambat < 7) {
+                                            $labelTerlambat = $hariTerlambat . ' hari';
+                                        } elseif ($hariTerlambat < 30) {
+                                            $labelTerlambat = intdiv($hariTerlambat, 7) . ' minggu';
+                                        } else {
+                                            $labelTerlambat = intdiv($hariTerlambat, 30) . ' bulan';
+                                        }
+                                    }
+                                }
+                            @endphp
+
                             {{-- CARD TAGIHAN --}}
-                            <div class="bg-white p-5 rounded-2xl border {{ $adaDiskon ? 'border-fuchsia-200' : 'border-slate-100' }} flex flex-col justify-between hover:border-rose-200 transition-all duration-300 shadow-sm hover:shadow-md">
+                                <div class="bg-white p-5 rounded-2xl border {{ $sudahTerlambat ? 'border-rose-300' : ($adaDiskon ? 'border-fuchsia-200' : 'border-slate-100') }} flex flex-col justify-between hover:border-rose-200 transition-all duration-300 shadow-sm hover:shadow-md">
 
                                 <div>
 
@@ -348,6 +371,12 @@
                                                     ❌ Belum Bayar
                                                 </span>
 
+                                                @if($sudahTerlambat)
+                                                    <span class="ml-1 bg-rose-600 text-white font-bold px-2.5 py-1.5 rounded-lg text-[10px] border border-rose-700 animate-pulse-subtle inline-block mt-1">
+                                                        ⏰ Terlambat {{ $labelTerlambat }}
+                                                    </span>
+                                                @endif
+
                                             @endif
 
                                         </div>
@@ -363,7 +392,7 @@
                                                     onclick="ambilTokenMidtrans(event, '{{ $tagihan->id }}')"
                                                     class="bg-rose-500 hover:bg-rose-600 text-white font-bold px-4 py-2 rounded-xl text-[10px] transition-colors"
                                                 >
-                                                    Bayar Sekarang
+                                                    Bayar
                                                 </button>
 
                                             @endif
