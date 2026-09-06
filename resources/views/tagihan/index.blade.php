@@ -404,7 +404,7 @@
                                                     href="{{ route('tagihan.unduh', $tagihan->id) }}"
                                                     class="flex-1 sm:flex-none text-center whitespace-nowrap bg-slate-800 hover:bg-slate-900 text-white font-bold px-3 py-2 rounded-xl text-[10px] transition-colors"
                                                 >
-                                                    Invoice
+                                                    UNDUH INVOICE
                                                 </a>
 
                                             @endif
