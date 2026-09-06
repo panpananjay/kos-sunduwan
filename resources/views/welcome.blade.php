@@ -130,7 +130,7 @@
 
             <div class="flex justify-center">
                 <a href="#katalog-kamar" class="inline-flex items-center justify-center px-6 py-3.5 sm:px-8 sm:py-4 text-sm sm:text-base font-bold rounded-full text-white bg-rose-500 hover:bg-rose-700 shadow-xl shadow-rose-200 transform hover:-translate-y-1 transition duration-300">
-                    Lihat Kamar Tersedia 👇
+                    Lihat Ketersediaan Kamar 👇
                 </a>
             </div>
         </div>
