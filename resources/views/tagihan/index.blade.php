@@ -455,6 +455,28 @@
 
                                                 @endif
 
+                                                {{-- TERBITKAN ULANG TAGIHAN DIBATALKAN --}}
+                                                @if($tagihan->status == 'dibatalkan')
+
+                                                    <form
+                                                        action="{{ route('tagihan.terbitkan_ulang', $tagihan->id) }}"
+                                                        method="POST"
+                                                        onsubmit="return confirm('Terbitkan ulang tagihan ini? Harga kamar terbaru akan dipakai dan voucher lama akan dilepas.')"
+                                                        class="flex-1 sm:flex-none"
+                                                    >
+                                                        @csrf
+                                                        @method('PUT')
+
+                                                        <button
+                                                            type="submit"
+                                                            class="w-full whitespace-nowrap bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-bold px-3 py-2 rounded-xl text-[10px] transition-colors"
+                                                        >
+                                                            🔄 Terbitkan Ulang
+                                                        </button>
+                                                    </form>
+
+                                                @endif
+
                                             @endif
 
                                         </div>

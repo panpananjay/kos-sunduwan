@@ -155,6 +155,63 @@ class TagihanController extends Controller
     }
 
     /**
+     * Terbitkan ulang SATU tagihan yang berstatus dibatalkan, langsung dari
+     * kartu tagihannya, tanpa perlu memfilter bulan dulu lewat "Terbitkan
+     * Tagihan" massal. Memakai harga kamar terbaru dan melepas voucher lama
+     * yang masih menempel, mirror dari cabang elseif('dibatalkan') di
+     * generate() di atas.
+     */
+    public function terbitkanUlang($id)
+    {
+        $tagihan = Tagihan::with(['penghuni.kamar', 'vouchers'])->findOrFail($id);
+
+        if ($tagihan->status !== 'dibatalkan') {
+            return redirect()->route('tagihan.index')
+                ->with('error', 'Hanya tagihan berstatus Dibatalkan yang bisa diterbitkan ulang.');
+        }
+
+        if (!$tagihan->penghuni || !$tagihan->penghuni->kamar) {
+            return redirect()->route('tagihan.index')
+                ->with('error', 'Gagal menerbitkan ulang: data penghuni atau kamar tagihan ini tidak lengkap.');
+        }
+
+        // Lepas voucher yang masih menempel dari siklus pembatalan sebelumnya,
+        // sama seperti bugfix yang sudah ada di destroy()
+        foreach ($tagihan->vouchers as $voucher) {
+            $statusBaru = ($voucher->masa_berlaku && Carbon::parse($voucher->masa_berlaku)->isPast())
+                ? 'expired'
+                : 'aktif';
+
+            $voucher->update([
+                'status'     => $statusBaru,
+                'tagihan_id' => null,
+            ]);
+        }
+
+        $tagihan->update([
+            'jumlah_tagihan' => $tagihan->penghuni->kamar->harga ?? 0,
+            'status'         => 'belum_bayar',
+            'catatan'        => null,
+        ]);
+
+        // Kirim notifikasi WhatsApp
+        $nominal = number_format($tagihan->jumlah_tagihan, 0, ',', '.');
+        $pesan = "*--- NOTIFIKASI TAGIHAN KOS ---*\n\n" .
+                "Halo *{$tagihan->penghuni->nama}* 👋\n" .
+                "Tagihan periode *{$tagihan->bulan} {$tagihan->tahun}* telah diterbitkan ulang oleh admin.\n\n" .
+                "💰 Total: *Rp {$nominal}*\n" .
+                "📌 Status: *BELUM BAYAR*\n\n" .
+                "Silakan selesaikan pembayaran otomatis secara aman melalui aplikasi ya! ✨";
+
+        if (!empty($tagihan->penghuni->no_hp)) {
+            $this->sendWhatsApp($tagihan->penghuni->no_hp, $pesan);
+        }
+
+        return redirect()->route('tagihan.index')
+            ->with('success', 'Tagihan ' . $tagihan->penghuni->nama . ' periode ' . $tagihan->bulan . ' ' . $tagihan->tahun . ' berhasil diterbitkan ulang.');
+    }
+
+    /**
      * Mengambil Snap Token dari Midtrans untuk Pembayaran Otomatis
      */
     public function bayar($id)

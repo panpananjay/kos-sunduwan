@@ -111,6 +111,9 @@ Route::middleware([
     Route::delete('/tagihan/{id}', [TagihanController::class, 'destroy'])
         ->name('tagihan.destroy');
 
+    Route::put('/tagihan/{id}/terbitkan-ulang', [TagihanController::class, 'terbitkanUlang'])
+        ->name('tagihan.terbitkan_ulang');
+
     // Respon Pengaduan Admin
     Route::patch('/pengaduan/{id}/respon', [PengaduanController::class, 'respon'])
         ->name('pengaduan.respon');
