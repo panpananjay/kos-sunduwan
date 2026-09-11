@@ -28,7 +28,21 @@ class TagihanController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        $query = Tagihan::with('penghuni.kamar')->latest();
+
+        // Catatan: whereHas('penghuni', status = aktif) memastikan tagihan
+        // milik penghuni yang sudah dibatalkan/dinonaktifkan (lihat
+        // PenghuniController::destroy) TIDAK ikut muncul di daftar tagihan.
+        // Data tagihannya sendiri tetap ada di database untuk menjaga
+        // riwayat (dan tetap bisa diterbitkan ulang kalau penghuninya
+        // diaktifkan kembali via PenghuniController::activate), hanya
+        // tidak ditampilkan di menu ini selama nonaktif. Ini konsisten
+        // dengan filter yang sama di DashboardController untuk laporan
+        // keuangan.
+        $query = Tagihan::with('penghuni.kamar')
+            ->whereHas('penghuni', function ($q) {
+                $q->where('status', 'aktif');
+            })
+            ->latest();
 
         if ($user->role == 'admin') {
             $currentNotifCount = Tagihan::where('status', 'menunggu_verifikasi')->count();
