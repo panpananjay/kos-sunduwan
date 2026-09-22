@@ -29,20 +29,17 @@ class TagihanController extends Controller
     {
         $user = auth()->user();
 
-        // Catatan: whereHas('penghuni', status = aktif) memastikan tagihan
-        // milik penghuni yang sudah dibatalkan/dinonaktifkan (lihat
-        // PenghuniController::destroy) TIDAK ikut muncul di daftar tagihan.
-        // Data tagihannya sendiri tetap ada di database untuk menjaga
-        // riwayat (dan tetap bisa diterbitkan ulang kalau penghuninya
-        // diaktifkan kembali via PenghuniController::activate), hanya
-        // tidak ditampilkan di menu ini selama nonaktif. Ini konsisten
-        // dengan filter yang sama di DashboardController untuk laporan
-        // keuangan.
+        $daftarBulan = [
+            'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+        ];
+
         $query = Tagihan::with('penghuni.kamar')
             ->whereHas('penghuni', function ($q) {
                 $q->where('status', 'aktif');
             })
-            ->latest();
+            ->orderByDesc('tahun')
+            ->orderByRaw("FIELD(bulan, '" . implode("','", $daftarBulan) . "') DESC");
 
         if ($user->role == 'admin') {
             $currentNotifCount = Tagihan::where('status', 'menunggu_verifikasi')->count();
@@ -74,93 +71,107 @@ class TagihanController extends Controller
         return view('tagihan.index', compact('tagihans'));
     }
 
-    public function generate(Request $request)
+    /**
+     * Terbitkan satu tagihan untuk satu penghuni pada bulan/tahun tertentu,
+     * lalu kirim notifikasi WhatsApp. Dipakai oleh generate() (manual, admin),
+     * PenghuniController::store() (tagihan pertama saat penghuni baru daftar),
+     * dan GenerateTagihanOtomatis (command harian, anniversary-based).
+     * Return true kalau tagihan baru dibuat/diterbitkan ulang, false kalau di-skip.
+     */
+    public function terbitkanTagihanUntukPenghuni($penghuni, $bulan, $tahun)
     {
-        Carbon::setLocale('id');
-        // Ambil input bulan & tahun dari request, atau default ke bulan/tahun sekarang
-        $bulan = $request->input('bulan', Carbon::now()->translatedFormat('F'));
-        $tahun = $request->input('tahun', Carbon::now()->year);
+        $tagihan = Tagihan::where('penghuni_id', $penghuni->id)
+                            ->where('bulan', $bulan)
+                            ->where('tahun', $tahun)
+                            ->first();
 
-        $penghunis = Penghuni::whereNotNull('kamar_id')->with('kamar')->get();
-        
-        if ($penghunis->isEmpty()) {
-            return redirect()->back()->with('error', "Gagal! Data penghuni kosong atau belum ada yang punya kamar.");
-        }
-
-        $jumlahTerkirim = 0;
+        // Logika reset poin tahunan
         $daftarBulan = [
             1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
             5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
             9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
         ];
+        if ($penghuni->created_at) {
+            $bulan_masuk = $daftarBulan[$penghuni->created_at->month];
+            $tahun_masuk = $penghuni->created_at->year;
+            if ($bulan_masuk == $bulan && $tahun > $tahun_masuk && !$tagihan) {
+                $penghuni->update(['poin' => 0]);
+            }
+        }
 
+        // Jika tagihan sudah ada dan statusnya sudah lunas / menunggu verifikasi, skip
+        if ($tagihan && in_array($tagihan->status, ['lunas', 'menunggu_verifikasi'])) {
+            return false;
+        }
+
+        if (!$tagihan) {
+            // Tagihan belum ada sama sekali → buat baru
+            $tagihan = Tagihan::create([
+                'penghuni_id'    => $penghuni->id,
+                'bulan'          => $bulan,
+                'tahun'          => $tahun,
+                'jumlah_tagihan' => $penghuni->kamar->harga ?? 0,
+                'status'         => 'belum_bayar',
+            ]);
+        } elseif ($tagihan->status === 'dibatalkan') {
+            // Tagihan bulan ini sebelumnya dibatalkan → terbitkan ulang
+            foreach ($tagihan->vouchers as $voucher) {
+                $statusBaru = ($voucher->masa_berlaku && Carbon::parse($voucher->masa_berlaku)->isPast())
+                    ? 'expired'
+                    : 'aktif';
+
+                $voucher->update([
+                    'status'     => $statusBaru,
+                    'tagihan_id' => null,
+                ]);
+            }
+
+            $tagihan->update([
+                'jumlah_tagihan' => $penghuni->kamar->harga ?? 0,
+                'status'         => 'belum_bayar',
+                'catatan'        => null,
+            ]);
+        } else {
+            // Sudah ada dan berstatus 'belum_bayar' → jangan kirim notif berulang
+            return false;
+        }
+
+        // Kirim notifikasi WhatsApp
+        $nominal = number_format($tagihan->jumlah_tagihan, 0, ',', '.');
+        $pesan = "*--- NOTIFIKASI TAGIHAN KOS ---*\n\n" .
+                "Halo *{$penghuni->nama}* 👋\n" .
+                "Informasi tagihan periode *{$bulan} {$tahun}* sudah terbit.\n\n" .
+                "💰 Total: *Rp {$nominal}*\n" .
+                "📌 Status: *BELUM BAYAR*\n\n" .
+                "Silakan selesaikan pembayaran otomatis secara aman melalui aplikasi ya! ✨";
+
+        if (!empty($penghuni->no_hp)) {
+            $this->sendWhatsApp($penghuni->no_hp, $pesan);
+        }
+
+        return true;
+    }
+
+    /**
+     * Terbitkan tagihan bulanan secara manual & serentak untuk semua penghuni
+     * (dipicu admin lewat tombol "Terbitkan Tagihan"). Tetap dipertahankan
+     * sebagai jalur manual/darurat, di luar alur otomatis anniversary-based.
+     */
+    public function generate(Request $request)
+    {
+        Carbon::setLocale('id');
+        $bulan = $request->input('bulan', Carbon::now()->translatedFormat('F'));
+        $tahun = $request->input('tahun', Carbon::now()->year);
+
+        $penghunis = Penghuni::whereNotNull('kamar_id')->with('kamar')->get();
+
+        if ($penghunis->isEmpty()) {
+            return redirect()->back()->with('error', "Gagal! Data penghuni kosong atau belum ada yang punya kamar.");
+        }
+
+        $jumlahTerkirim = 0;
         foreach ($penghunis as $penghuni) {
-            // 1. Cari apakah tagihan untuk penghuni di bulan & tahun ini sudah ada
-            $tagihan = Tagihan::where('penghuni_id', $penghuni->id)
-                                ->where('bulan', $bulan)
-                                ->where('tahun', $tahun)
-                                ->first();
-
-            // Logika reset poin tahunan
-            if ($penghuni->created_at) {
-                $bulan_masuk = $daftarBulan[$penghuni->created_at->month]; 
-                $tahun_masuk = $penghuni->created_at->year;
-                if ($bulan_masuk == $bulan && $tahun > $tahun_masuk && !$tagihan) {
-                    $penghuni->update(['poin' => 0]);
-                }
-            }
-
-            // 2. Jika tagihan sudah ada dan statusnya sudah lunas / menunggu verifikasi, skip
-            if ($tagihan && in_array($tagihan->status, ['lunas', 'menunggu_verifikasi'])) {
-                continue; 
-            }
-
-            // 3. Jika tagihan belum ada sama sekali, buat baru di database
-            if (!$tagihan) {
-                $tagihan = Tagihan::create([
-                    'penghuni_id'    => $penghuni->id,
-                    'bulan'          => $bulan,
-                    'tahun'          => $tahun,
-                    'jumlah_tagihan' => $penghuni->kamar->harga ?? 0,
-                    'status'         => 'belum_bayar',
-                ]);
-            }
-            // 3b. Jika tagihan bulan ini sebelumnya pernah DIBATALKAN, terbitkan ulang
-            // dengan harga terbaru, alih-alih dibiarkan menggantung berstatus dibatalkan
-            elseif ($tagihan->status === 'dibatalkan') {
-
-                // Safety net: pastikan tidak ada voucher tersisa yang masih
-                // menempel dari siklus pembatalan sebelumnya (mis. data yang
-                // sempat salah sebelum bugfix di destroy() ditambahkan).
-                foreach ($tagihan->vouchers as $voucher) {
-                    $statusBaru = ($voucher->masa_berlaku && \Carbon\Carbon::parse($voucher->masa_berlaku)->isPast())
-                        ? 'expired'
-                        : 'aktif';
-
-                    $voucher->update([
-                        'status'     => $statusBaru,
-                        'tagihan_id' => null,
-                    ]);
-                }
-
-                $tagihan->update([
-                    'jumlah_tagihan' => $penghuni->kamar->harga ?? 0,
-                    'status'         => 'belum_bayar',
-                    'catatan'        => null,
-                ]);
-            }
-
-            // 4. Kirim notifikasi WhatsApp
-            $nominal = number_format($tagihan->jumlah_tagihan, 0, ',', '.');
-            $pesan = "*--- NOTIFIKASI TAGIHAN KOS ---*\n\n" .
-                    "Halo *{$penghuni->nama}* 👋\n" .
-                    "Informasi tagihan periode *{$bulan} {$tahun}* sudah terbit.\n\n" .
-                    "💰 Total: *Rp {$nominal}*\n" .
-                    "📌 Status: *BELUM BAYAR*\n\n" .
-                    "Silakan selesaikan pembayaran otomatis secara aman melalui aplikasi ya! ✨";
-
-            if (!empty($penghuni->no_hp)) {
-                $this->sendWhatsApp($penghuni->no_hp, $pesan);
+            if ($this->terbitkanTagihanUntukPenghuni($penghuni, $bulan, $tahun)) {
                 $jumlahTerkirim++;
             }
         }
@@ -173,7 +184,7 @@ class TagihanController extends Controller
      * kartu tagihannya, tanpa perlu memfilter bulan dulu lewat "Terbitkan
      * Tagihan" massal. Memakai harga kamar terbaru dan melepas voucher lama
      * yang masih menempel, mirror dari cabang elseif('dibatalkan') di
-     * generate() di atas.
+     * terbitkanTagihanUntukPenghuni() di atas.
      */
     public function terbitkanUlang($id)
     {
@@ -189,8 +200,6 @@ class TagihanController extends Controller
                 ->with('error', 'Gagal menerbitkan ulang: data penghuni atau kamar tagihan ini tidak lengkap.');
         }
 
-        // Lepas voucher yang masih menempel dari siklus pembatalan sebelumnya,
-        // sama seperti bugfix yang sudah ada di destroy()
         foreach ($tagihan->vouchers as $voucher) {
             $statusBaru = ($voucher->masa_berlaku && Carbon::parse($voucher->masa_berlaku)->isPast())
                 ? 'expired'
@@ -208,7 +217,6 @@ class TagihanController extends Controller
             'catatan'        => null,
         ]);
 
-        // Kirim notifikasi WhatsApp
         $nominal = number_format($tagihan->jumlah_tagihan, 0, ',', '.');
         $pesan = "*--- NOTIFIKASI TAGIHAN KOS ---*\n\n" .
                 "Halo *{$tagihan->penghuni->nama}* 👋\n" .
@@ -287,7 +295,6 @@ class TagihanController extends Controller
      */
     private function prosesPelunasanOtomatis($tagihan, $paymentType = null)
     {
-        // Penentuan Catatan Pembayaran
         $catatan = match($paymentType) {
             'cash_manual' => 'DIBAYAR VIA CASH MANUAL (ADMIN)',
             'manual'      => 'DIBAYAR VIA VERIFIKASI MANUAL (ADMIN)',
@@ -299,7 +306,6 @@ class TagihanController extends Controller
             'catatan' => $catatan
         ]);
 
-        // LOGIKA GAMIFIKASI POIN (DEADLINE 7 HARI PENUH HINGGA PUKUL 23:59:59)
         $deadline = Carbon::parse($tagihan->created_at)->addDays(7)->endOfDay();
         $tanggalBayar = Carbon::now();
 
@@ -317,7 +323,6 @@ class TagihanController extends Controller
             $warna_bg_gamifikasi = '#fff1f2'; 
         }
 
-        // Pengaman relasi jika data penghuni kosong
         if ($tagihan->penghuni) {
             $tagihan->penghuni->increment('poin', $poin_tambahan);
             $penghuni = $tagihan->penghuni->fresh();
@@ -328,7 +333,6 @@ class TagihanController extends Controller
             $penghuni->poin = 0;
         }
 
-        // GENERATE FISIK INVOICE (.PNG)
         $templatePath = public_path('images/template_invoice.jpg');
         if (!file_exists($templatePath)) {
             return;
@@ -468,7 +472,7 @@ class TagihanController extends Controller
         return redirect()->back()->with('error', 'Tagihan ini sudah berstatus lunas.');
     }
 
-    private function sendWhatsApp($target, $message)
+    protected function sendWhatsApp($target, $message)
     {
         $target = preg_replace('/[^0-9]/', '', $target);
         if (strpos($target, '0') === 0) {
@@ -498,27 +502,13 @@ class TagihanController extends Controller
     {
         $tagihan = Tagihan::with('vouchers')->findOrFail($id);
 
-        // Cegah pembatalan tagihan yang statusnya sudah lunas —
-        // supaya riwayat pembayaran yang sah nggak bisa "hilang" lewat tombol ini
         if ($tagihan->status === 'lunas') {
             return redirect()->route('tagihan.index')
                 ->with('error', 'Tagihan yang sudah lunas tidak bisa dibatalkan.');
         }
 
-        // BUGFIX: lepaskan voucher yang terpasang di tagihan ini sebelum
-        // dibatalkan. Tanpa ini, voucher lama (status 'terpakai',
-        // tagihan_id => tagihan ini) tetap menempel, dan ketika tagihan
-        // diterbitkan ulang lewat generate() dengan ID yang sama, voucher
-        // itu ikut terbawa dan salah menghitung "harga sebelum diskon" di
-        // kartu tagihan — padahal diskonnya belum pernah benar-benar
-        // dipakai karena pembayarannya sendiri batal.
         foreach ($tagihan->vouchers as $voucher) {
             if ($voucher->status === 'terpakai') {
-
-                // Kalau voucher belum lewat masa berlaku, kembalikan ke
-                // 'aktif' supaya penghuni bisa memakainya lagi. Kalau
-                // sudah lewat masa berlaku, cukup lepaskan tagihan_id-nya
-                // dan biarkan statusnya 'expired'.
                 $statusBaru = ($voucher->masa_berlaku && \Carbon\Carbon::parse($voucher->masa_berlaku)->isPast())
                     ? 'expired'
                     : 'aktif';

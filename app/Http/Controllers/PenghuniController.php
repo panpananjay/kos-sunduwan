@@ -7,12 +7,12 @@ use App\Models\Penghuni;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class PenghuniController extends Controller
 {
     public function index(Request $request)
     {
-        // Filter status: default cuma tampilkan yang aktif
         $status = $request->query('status', 'aktif');
 
         $query = Penghuni::with('kamar');
@@ -21,7 +21,6 @@ class PenghuniController extends Controller
             $query->where('status', $status);
         }
 
-        // Bawa datanya ke halaman daftar penghuni
         $penghunis = $query->latest()->get();
 
         return view('penghuni.index', compact('penghunis', 'status'));
@@ -29,10 +28,8 @@ class PenghuniController extends Controller
 
     public function create()
     {
-        // Cari HANYA kamar yang statusnya kosong
         $kamarKosong = Kamar::where('status', 'kosong')->get();
 
-        // Bawa data kamar kosong itu ke halaman formulir penghuni
         return view('penghuni.create', compact('kamarKosong'));
     }
 
@@ -43,7 +40,7 @@ class PenghuniController extends Controller
             'nama' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z\s]+$/'],
             'no_hp' => ['required', 'string', 'regex:/^08[0-9]{8,11}$/'],
             'kamar_id' => 'required',
-            'username' => 'required|string|unique:users,username', // 👈 Kunci Anti-Duplikat
+            'username' => 'required|string|unique:users,username',
             'password' => 'required|string|min:8',
         ], [
             'nama.regex' => 'Nama lengkap hanya boleh berisi huruf dan spasi.',
@@ -61,7 +58,7 @@ class PenghuniController extends Controller
         ]);
 
         // 3. Simpan Biodata Penghuni (Tabel Penghunis)
-        \App\Models\Penghuni::create([
+        $penghuniBaru = \App\Models\Penghuni::create([
             'user_id' => $userBaru->id,
             'nama' => $request->nama,
             'no_hp' => $request->no_hp,
@@ -74,19 +71,24 @@ class PenghuniController extends Controller
             $kamarDipilih->update(['status' => 'terisi']);
         }
 
-        return redirect()->route('penghuni.index')->with('success', 'Penghuni baru dan akun login berhasil ditambahkan, Kamar otomatis terisi!');
+        // 👇 KABEL PENGHUBUNG 2: TERBITKAN TAGIHAN PERTAMA OTOMATIS 👇
+        Carbon::setLocale('id');
+        $bulanIni = Carbon::now()->translatedFormat('F');
+        $tahunIni = Carbon::now()->year;
+        $penghuniBaru->load('kamar');
+        app(\App\Http\Controllers\TagihanController::class)
+            ->terbitkanTagihanUntukPenghuni($penghuniBaru, $bulanIni, $tahunIni);
+
+        return redirect()->route('penghuni.index')->with('success', 'Penghuni baru dan akun login berhasil ditambahkan, Kamar otomatis terisi, tagihan pertama otomatis terbit!');
     }
 
     // MESIN 1: Untuk menampilkan formulir Edit
     public function edit($id)
     {
-        // Ikut sertakan data user agar variabel $penghuni->username bisa terbaca di blade edit
         $penghuni = \App\Models\Penghuni::with('user')->findOrFail($id);
 
-        // Inject properti username langsung ke objek penghuni dari relasi tabel user (biar clean di blade)
         $penghuni->username = $penghuni->user ? $penghuni->user->username : '';
 
-        // Ambil daftar kamar (Hanya kamar kosong + kamar yang sedang dipakai anak ini)
         $kamars = \App\Models\Kamar::where('status', 'kosong')
                                   ->orWhere('id', $penghuni->kamar_id)
                                   ->get();
@@ -99,7 +101,6 @@ class PenghuniController extends Controller
     {
         $penghuni = \App\Models\Penghuni::findOrFail($id);
 
-        // 1. Tambahkan validasi username unik, kecuali untuk ID User milik penghuni ini sendiri
         $request->validate([
             'nama' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z\s]+$/'],
             'username' => 'required|string|max:255|unique:users,username,' . $penghuni->user_id,
@@ -111,35 +112,30 @@ class PenghuniController extends Controller
             'username.unique' => 'Maaf, username ini sudah digunakan oleh akun lain!',
         ]);
 
-        // KABEL PENGHUBUNG 2: Cek apakah penghuni ini PINDAH KAMAR?
         if ($penghuni->kamar_id != $request->kamar_id) {
-            // Kalau pindah: Kamar lama diubah jadi "kosong"
             $kamarLama = \App\Models\Kamar::find($penghuni->kamar_id);
             if ($kamarLama) {
                 $kamarLama->update(['status' => 'kosong']);
             }
 
-            // Kamar baru diubah jadi "terisi"
             $kamarBaru = \App\Models\Kamar::find($request->kamar_id);
             if ($kamarBaru) {
                 $kamarBaru->update(['status' => 'terisi']);
             }
         }
 
-        // Simpan perubahan biodatanya ke tabel penghunis
         $penghuni->update([
             'nama' => $request->nama,
             'no_hp' => $request->no_hp,
             'kamar_id' => $request->kamar_id,
         ]);
 
-        // SINKRONISASI BARU: Update Nama DAN Username di akun login (tabel users)
         if ($penghuni->user_id) {
             $user = \App\Models\User::find($penghuni->user_id);
             if ($user) {
                 $user->update([
                     'name' => $request->nama,
-                    'username' => $request->username // 👤 Username terupdate dengan aman!
+                    'username' => $request->username
                 ]);
             }
         }
@@ -151,7 +147,6 @@ class PenghuniController extends Controller
     {
         $penghuni = \App\Models\Penghuni::findOrFail($id);
 
-        // Kosongkan kamarnya (kamar jadi tersedia buat penghuni baru)
         if ($penghuni->kamar_id) {
             $kamar = \App\Models\Kamar::find($penghuni->kamar_id);
             if ($kamar) {
@@ -159,14 +154,11 @@ class PenghuniController extends Controller
             }
         }
 
-        // Nonaktifkan penghuni — BUKAN dihapus, supaya riwayat tagihan tetap tersambung
         $penghuni->update([
             'status' => 'nonaktif',
             'kamar_id' => null,
         ]);
 
-        // Nonaktifkan akun login-nya juga (ganti password acak + jangan hapus,
-        // supaya riwayat siapa yang membuat/memverifikasi tagihan tetap utuh)
         if ($penghuni->user_id) {
             $user = \App\Models\User::find($penghuni->user_id);
             if ($user) {
@@ -179,7 +171,7 @@ class PenghuniController extends Controller
         return redirect()->route('penghuni.index')->with('success', 'Penghuni berhasil dinonaktifkan dan kamarnya otomatis menjadi kosong!');
     }
 
-    // 🆕 MESIN 4: Aktifkan kembali penghuni yang sudah dinonaktifkan
+    // MESIN 4: Aktifkan kembali penghuni yang sudah dinonaktifkan
     public function activate($id)
     {
         $penghuni = \App\Models\Penghuni::findOrFail($id);
@@ -197,7 +189,15 @@ class PenghuniController extends Controller
 
         $kamarKosong->update(['status' => 'terisi']);
 
-        return redirect()->route('penghuni.edit', $penghuni->id)->with('success', $penghuni->nama.' berhasil diaktifkan kembali di Kamar '.$kamarKosong->nomor_kamar.'. Silakan sesuaikan datanya kalau perlu.');
+        // 👇 TERBITKAN TAGIHAN PERTAMA OTOMATIS, SAMA SEPERTI PENDAFTARAN BARU 👇
+        Carbon::setLocale('id');
+        $bulanIni = Carbon::now()->translatedFormat('F');
+        $tahunIni = Carbon::now()->year;
+        $penghuni->load('kamar');
+        app(\App\Http\Controllers\TagihanController::class)
+            ->terbitkanTagihanUntukPenghuni($penghuni, $bulanIni, $tahunIni);
+
+        return redirect()->route('penghuni.edit', $penghuni->id)->with('success', $penghuni->nama.' berhasil diaktifkan kembali di Kamar '.$kamarKosong->nomor_kamar.', tagihan periode ini otomatis terbit. Silakan sesuaikan datanya kalau perlu.');
     }
 
     // MESIN 3: Untuk mereset password anak kos yang pelupa

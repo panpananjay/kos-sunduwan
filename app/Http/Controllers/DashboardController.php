@@ -78,8 +78,17 @@ class DashboardController extends Controller
 
             $kamarKosong = Kamar::where('status', 'kosong')->count();
 
+            // Catatan: whereHas('penghuni', status = aktif) ditambahkan
+            // supaya tagihan milik penghuni yang sudah dinonaktifkan
+            // (dibatalkan) TIDAK ikut dihitung di laporan keuangan
+            // (Target Pendapatan, Uang Sudah Masuk, Piutang). Data
+            // tagihannya sendiri tetap ada di database (tidak dihapus)
+            // untuk menjaga riwayat, hanya tidak diikutkan ke laporan.
             $queryTagihan = Tagihan::where('tahun', $tahunIni)
-                ->where('status', '!=', 'dibatalkan');
+                ->where('status', '!=', 'dibatalkan')
+                ->whereHas('penghuni', function ($q) {
+                    $q->where('status', 'aktif');
+                });
 
             // Jika filter bukan "Semua", filter berdasarkan bulan
             if ($bulanIni !== 'Semua') {
@@ -108,7 +117,14 @@ class DashboardController extends Controller
             // ==========================================
             // FORECASTING 3 BULAN — SINGLE MOVING AVERAGE
             // ==========================================
-
+            //
+            // Catatan: forecasting SENGAJA tetap memakai SELURUH riwayat
+            // tagihan lunas (termasuk dari penghuni yang sudah nonaktif/
+            // keluar), karena tujuannya memproyeksikan pola pendapatan
+            // kos secara keseluruhan ke depan (kamar yang kosong akan
+            // terisi penghuni baru) — bukan proyeksi per penghuni. Kalau
+            // riwayat ini ikut di-exclude, data historisnya jadi lebih
+            // sedikit/bolong dan proyeksinya malah kurang akurat.
             $forecasting = $this->hitungForecastingSma(
                 $bulanIni,
                 $tahunIni,
@@ -418,6 +434,12 @@ class DashboardController extends Controller
      *    yang SEDANG DIFILTER di dashboard ($bulanIni/$tahunIni), bukan
      *    selalu tanggal hari ini — supaya forecasting tetap akurat saat
      *    admin melihat data periode lampau.
+     *
+     * Catatan: perhitungan ini SENGAJA memakai seluruh riwayat tagihan
+     * lunas tanpa memandang status aktif/nonaktif penghuni saat ini,
+     * karena tujuannya memproyeksikan pola pendapatan kos secara
+     * keseluruhan (kamar kosong akan terisi penghuni baru), bukan
+     * proyeksi per penghuni.
      *
      * @param  string  $bulanIni
      * @param  int|string  $tahunIni
